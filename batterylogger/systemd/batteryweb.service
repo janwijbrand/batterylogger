@@ -1,0 +1,13 @@
+[Unit]
+Description=AccuBox battery dashboard (Flask, read-only)
+After=network.target batterylogger.service
+
+[Service]
+Type=simple
+User=__USER__
+ExecStart=/home/__USER__/batterylogger/venv/bin/python /home/__USER__/batterylogger/webapp.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

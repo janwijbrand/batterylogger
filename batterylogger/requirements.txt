@@ -1,0 +1,5 @@
+# Installed into the Pi's venv (piwheels provides ARMv6 wheels).
+# Pillow for the future e-ink render comes from apt (python3-pil), not here.
+bleak
+aiobmsble
+flask

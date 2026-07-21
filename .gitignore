@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# Runtime data (lives on the Pi, not in git)
+*.db
+*.db-wal
+*.db-shm
+
+# Local, machine-specific Claude settings
+.claude/settings.local.json
+
+# OS cruft
+.DS_Store
