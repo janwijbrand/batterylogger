@@ -1,0 +1,18 @@
+[Unit]
+Description=ECTIVE AccuBox BLE battery logger
+After=bluetooth.service network-online.target
+Wants=bluetooth.service
+
+[Service]
+Type=simple
+User=__USER__
+# Ensure the shared WiFi/BT radio is un-rfkilled and powered after a cold boot
+# ('+' runs as root regardless of User=; '-' ignores non-zero exit).
+ExecStartPre=+-/usr/sbin/rfkill unblock bluetooth
+ExecStartPre=+-/usr/bin/hciconfig hci0 up
+ExecStart=/home/__USER__/batterylogger/venv/bin/python /home/__USER__/batterylogger/logger.py
+Restart=always
+RestartSec=15
+
+[Install]
+WantedBy=multi-user.target

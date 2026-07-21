@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>batterijtje · AccuBox</title>
+<style>
+  :root { --ink:#111; --paper:#fff; --mid:#777; --hair:#e5e5e5; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:#2a2a2a; color:var(--ink);
+         font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+         min-height:100vh; display:flex; flex-direction:column; align-items:center;
+         justify-content:center; gap:10px; padding:20px; }
+  /* #panel == the physical 800x480 e-ink screen */
+  #panel { width:800px; height:480px; background:var(--paper); border-radius:6px;
+           box-shadow:0 10px 40px rgba(0,0,0,.5); padding:16px 20px;
+           display:grid; grid-template-rows:auto 172px 1fr 116px; gap:9px; }
+
+  header { display:flex; justify-content:space-between; align-items:baseline;
+           border-bottom:2px solid var(--ink); padding-bottom:6px; }
+  header .name { font-size:19px; font-weight:800; letter-spacing:.5px; }
+  header .upd  { font-size:13px; color:var(--mid); }
+  #stale { color:#b00; font-weight:700; }
+
+  .now { display:grid; grid-template-columns:250px 1fr; gap:20px; min-height:0; }
+  .soc { display:flex; flex-direction:column; justify-content:center; }
+  .soc .pct { font-size:74px; font-weight:800; line-height:.85; letter-spacing:-2px; }
+  .soc .pct small { font-size:30px; font-weight:700; }
+  .soc .ah  { font-size:15px; color:var(--mid); margin-top:4px; }
+  .battery { margin-top:10px; height:28px; width:210px; border:3px solid var(--ink);
+             border-radius:5px; position:relative; padding:3px; }
+  .battery::after { content:""; position:absolute; right:-9px; top:7px; width:6px;
+                    height:12px; background:var(--ink); border-radius:0 2px 2px 0; }
+  .battery > i { display:block; height:100%; background:var(--ink); border-radius:2px; }
+  .soc .state { margin-top:9px; font-size:21px; font-weight:800; }
+
+  .tiles { display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; gap:8px; }
+  .tile { border:1.5px solid var(--hair); border-radius:6px; padding:7px 13px;
+          display:flex; flex-direction:column; justify-content:center; }
+  .tile .k { font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--mid); }
+  .tile .v { font-size:29px; font-weight:800; line-height:1.1; }
+  .tile .v small { font-size:15px; font-weight:600; color:var(--mid); }
+  .tile .v .arw { font-size:.62em; vertical-align:2px; margin-right:1px; }
+
+  .chart { display:flex; flex-direction:column; gap:2px; min-height:0; }
+  .chart .lbl { font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--mid);
+                display:flex; justify-content:space-between; }
+  svg { display:block; width:100%; flex:1; min-height:0; }
+  footer { width:800px; max-width:100%; font-size:11px; color:#bbb;
+           display:flex; justify-content:space-between; }
+</style>
+</head>
+<body>
+  <div id="panel">
+    <header>
+      <div class="name" id="devname">batterijtje</div>
+      <div class="upd" id="updated">…</div>
+    </header>
+
+    <div class="now">
+      <div class="soc">
+        <div class="pct" id="soc">–<small>%</small></div>
+        <div class="ah" id="ah">— Ah remaining</div>
+        <div class="battery"><i id="batfill" style="width:0%"></i></div>
+        <div class="state" id="state">–</div>
+      </div>
+      <div class="tiles">
+        <div class="tile"><div class="k">Current</div><div class="v" id="curr">–<small>A</small></div></div>
+        <div class="tile"><div class="k">Voltage</div><div class="v" id="volt">–<small>V</small></div></div>
+        <div class="tile"><div class="k">Power</div><div class="v" id="pow">–<small>W</small></div></div>
+        <div class="tile"><div class="k" id="rtk">Time to empty</div><div class="v" id="rtime">–</div></div>
+      </div>
+    </div>
+
+    <div class="chart">
+      <div class="lbl"><span>48 h · State of charge</span><span id="sparkrange"></span></div>
+      <svg id="sparksvg" viewBox="0 0 800 80" preserveAspectRatio="none"></svg>
+    </div>
+
+    <div class="chart">
+      <div class="lbl"><span title="net at the battery terminal — loads running while charging are not separated from the charge current">Daily energy · net Ah</span><span>last night ▼ <b id="lastnight">–</b> Ah</span></div>
+      <svg id="barssvg" class="bars" viewBox="0 0 800 120" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+  </div>
+
+  <footer>
+    <span id="rows"></span><span>auto-refresh 10s · <span id="clock"></span></span>
+  </footer>
+
+<script>
+const $ = id => document.getElementById(id);
+const fmt = (n,d=1) => (n==null?'–':Number(n).toFixed(d));
+const agoStr = s => s<90?`${s|0}s ago`:s<5400?`${(s/60)|0}m ago`:`${(s/3600).toFixed(1)}h ago`;
+const fmtDur = (h,m) => h==null?'–':(h>=48?`~${Math.round(h/24)} d`:(h>=1?`${h} h ${String(m).padStart(2,'0')} m`:`${m|0} m`));
+
+function drawSpark(series, now){
+  const svg=$('sparksvg'); svg.innerHTML='';
+  const W=800,H=80,pad=5;
+  if(!series.length){ svg.innerHTML='<text x="400" y="45" text-anchor="middle" fill="#999" font-size="13">collecting…</text>'; return; }
+  const t0=now-48*3600, t1=now;
+  const x=t=>pad+(t-t0)/(t1-t0)*(W-2*pad);
+  const y=s=>H-pad-(s/100)*(H-2*pad);
+  [0,50,100].forEach(g=>{
+    const yy=y(g).toFixed(1);
+    svg.insertAdjacentHTML('beforeend',`<line x1="20" y1="${yy}" x2="${W}" y2="${yy}" stroke="#eee"/>`+
+      `<text x="0" y="${(+yy+3)}" fill="#bbb" font-size="9">${g}</text>`);
+  });
+  let d='';
+  series.forEach((p,i)=>{ d+=(i?'L':'M')+x(p.ts).toFixed(1)+' '+y(p.soc).toFixed(1)+' '; });
+  svg.insertAdjacentHTML('beforeend',`<path d="${d}" fill="none" stroke="#111" stroke-width="2" stroke-linejoin="round"/>`);
+  const last=series[series.length-1];
+  svg.insertAdjacentHTML('beforeend',`<circle cx="${x(last.ts).toFixed(1)}" cy="${y(last.soc).toFixed(1)}" r="3" fill="#111"/>`);
+}
+
+function drawBars(daily){
+  const svg=$('barssvg'); svg.innerHTML='';
+  const W=800,H=120,padL=8,padR=8;
+  const axis=54;                    // baseline: in above, out below
+  const upRoom=axis-14, downRoom=H-axis-26;
+  if(!daily.length){ svg.innerHTML='<text x="400" y="'+axis+'" text-anchor="middle" fill="#999" font-size="13">a day of data needed for daily totals…</text>'; return; }
+  const days=daily.slice(-7);
+  const max=Math.max(1,...days.map(d=>Math.max(d.in,d.out)));
+  const bw=(W-padL-padR)/days.length;
+  const barW=Math.min(56, bw*0.5);
+  days.forEach((d,i)=>{
+    const cx=padL+i*bw+bw/2;
+    const inH=(d.in/max)*upRoom, outH=(d.out/max)*downRoom;
+    svg.insertAdjacentHTML('beforeend',
+      `<rect x="${cx-barW/2}" y="${axis-inH}" width="${barW}" height="${inH}" fill="#111"/>`+
+      `<rect x="${cx-barW/2}" y="${axis}" width="${barW}" height="${outH}" fill="#111"/>`+
+      `<text x="${cx}" y="${axis-inH-4}" text-anchor="middle" font-size="10" fill="#111">${d.in.toFixed(0)}</text>`+
+      `<text x="${cx}" y="${axis+outH+12}" text-anchor="middle" font-size="10" fill="#111">${d.out.toFixed(0)}</text>`+
+      `<text x="${cx}" y="${H-2}" text-anchor="middle" font-size="10" fill="#888">${d.day.slice(5)}</text>`);
+  });
+  svg.insertAdjacentHTML('beforeend',
+    `<line x1="${padL}" y1="${axis}" x2="${W-padR}" y2="${axis}" stroke="#111" stroke-width="1.5"/>`+
+    `<text x="${W-padR}" y="10" text-anchor="end" font-size="9" fill="#aaa">▲ in</text>`+
+    `<text x="${W-padR}" y="${H-3}" text-anchor="end" font-size="9" fill="#aaa">▼ out</text>`);
+}
+
+async function refresh(){
+  try{
+    const r=await fetch('/api/data',{cache:'no-store'}); const d=await r.json();
+    const L=d.latest;
+    if(L){
+      const chg=L.direction===0;
+      const arw=`<span class="arw">${chg?'▲':'▼'}</span>`;
+      $('soc').innerHTML=`${L.soc}<small>%</small>`;
+      $('batfill').style.width=Math.max(0,Math.min(100,L.soc))+'%';
+      $('ah').textContent=`${L.remaining_ah} Ah remaining`;
+      $('volt').innerHTML=`${fmt(L.voltage,1)}<small>V</small>`;
+      $('curr').innerHTML=`${arw}${Math.abs(L.current).toFixed(2)}<small>A</small>`;
+      $('pow').innerHTML=`${arw}${Math.abs(L.power)}<small>W</small>`;
+      $('state').textContent=chg?'▲ charging':'▼ consuming';
+      $('rtk').textContent=chg?'Time to full':'Time to empty';
+      $('rtime').textContent=fmtDur(L.rt_hours, L.rt_min);
+      const age=d.now-L.ts;
+      let u=age>180?`<span id="stale">stale · ${agoStr(age)}</span>`:`updated ${agoStr(age)}`;
+      if(L.synced===0) u=`<span id="stale">⚠ clock unsynced</span> · ${u}`;
+      $('updated').innerHTML=u;
+    } else { $('updated').textContent='no samples yet'; }
+    drawSpark(d.series||[], d.now);
+    drawBars(d.daily||[]);
+    $('lastnight').textContent = d.last_night ? d.last_night.out_ah : '–';
+    if(d.since){
+      const gaps=(d.daily||[]).reduce((s,x)=>s+(x.gaps||0),0);
+      $('rows').textContent=`${d.total_rows} samples since ${new Date(d.since*1000).toLocaleString()}`+(gaps?` · ${gaps} gaps (7d)`:'');
+    }
+    $('sparkrange').textContent=new Date((d.now-48*3600)*1000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})+' → now';
+  }catch(e){ $('updated').innerHTML='<span id="stale">connection error</span>'; }
+  $('clock').textContent=new Date().toLocaleTimeString();
+}
+refresh(); setInterval(refresh, 10000);
+</script>
+</body>
+</html>
