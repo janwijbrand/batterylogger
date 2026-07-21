@@ -1,5 +1,14 @@
 # batterijtje
 
+*A Raspberry Pi Zero that watches a campervan's LiFePO4 battery over Bluetooth
+and keeps the history the vendor app throws away.*
+
+![The batterijtje web dashboard](docs/dashboard.png)
+
+> The dashboard is a monochrome **800×480** layout — deliberately the prototype for
+> the planned e-ink display, so whatever you tune in the browser ports straight to the
+> HAT. *(Screenshot shows representative data.)*
+
 An always-on logger + dashboard for the LiFePO4 battery in a campervan
 (**ECTIVE Accubox 120S** power station). It polls the battery's BLE BMS, stores
 history in SQLite, and serves a small e-ink-style web dashboard — building the
