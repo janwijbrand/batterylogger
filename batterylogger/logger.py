@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Jan-Wijbrand Kolman
+# SPDX-License-Identifier: MIT
 """ECTIVE AccuBox BLE battery logger -> SQLite (poll-and-disconnect).
 
 Protocol reverse-engineered from the ECTIVE 'BM X' Android app

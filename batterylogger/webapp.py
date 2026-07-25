@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Jan-Wijbrand Kolman
+# SPDX-License-Identifier: MIT
 """Tiny read-only dashboard for the AccuBox logger DB.
 
 Serves an e-ink-style dashboard (prototype for the future Waveshare display)
