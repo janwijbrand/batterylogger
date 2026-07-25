@@ -14,3 +14,6 @@ venv/
 
 # OS cruft
 .DS_Store
+
+# compiled Go dashboard binary (build with webserver/build.sh)
+batterylogger/webserver/batteryweb-go
