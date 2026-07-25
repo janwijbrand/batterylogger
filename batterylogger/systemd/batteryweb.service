@@ -1,11 +1,14 @@
 [Unit]
-Description=AccuBox battery dashboard (Flask, read-only)
+Description=AccuBox battery dashboard (Go, read-only)
 After=network.target batterylogger.service
 
 [Service]
 Type=simple
 User=__USER__
-ExecStart=/home/__USER__/batterylogger/venv/bin/python /home/__USER__/batterylogger/webapp.py
+# Go rewrite of the dashboard. webapp.py is kept as a fallback — to revert, comment
+# the batteryweb-go line and uncomment the venv/python line, then `systemctl restart`.
+ExecStart=/home/__USER__/batterylogger/batteryweb-go
+# ExecStart=/home/__USER__/batterylogger/venv/bin/python /home/__USER__/batterylogger/webapp.py
 Restart=always
 RestartSec=10
 
