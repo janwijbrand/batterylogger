@@ -17,6 +17,7 @@ that the battery's own app throws away.
 
 See [`van-battery-logger-brief.md`](van-battery-logger-brief.md) for the original
 project brief and [`CLAUDE.md`](CLAUDE.md) for the short "read before editing" notes.
+Notable changes are tracked in [`CHANGES.md`](CHANGES.md).
 
 ## Hardware / platform
 
