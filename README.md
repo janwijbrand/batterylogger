@@ -54,7 +54,7 @@ Not documented publicly for the Accubox; recovered by decompiling the ECTIVE
   |-------|-------|-------|
   | 3–4   | remaining Ah | ×1 |
   | 5–6   | SoC % | — |
-  | 7–8 / 9–10 | remaining time | h / min |
+  | 7–8 / 9–10 | remaining time | h / min — *to empty* when discharging, *to full* when charging |
   | 11–12 | direction | 0 = charging (+), else discharging (−) |
   | 13–14 | current | ×0.01 A |
   | 15–16 | voltage | ×0.1 V |
