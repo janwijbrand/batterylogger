@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jan-Wijbrand Kolman
+// SPDX-License-Identifier: MIT
+
 // batteryweb-go — a single static binary that replaces webapp.py: it serves the
 // e-ink dashboard (web/index.html) and the /api/data JSON, reading the logger's
 // SQLite DB read-only. Feature-parity with webapp.py, including the 30s cache,
