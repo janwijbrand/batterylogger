@@ -125,6 +125,11 @@ cd batterylogger && ./deploy.sh user@hostname.local   # or: export DEPLOY_TARGET
 - [ ] E-ink render (Pillow → PNG → HAT), reusing the dashboard layout
 - [ ] Move development to the spare Pi 3
 
+## License
+
+[MIT](LICENSE) © 2026 Jan-Wijbrand Kolman. The reverse-engineered protocol
+description is provided for interoperability (see below) and contains no vendor code.
+
 ## Disclaimer
 
 Not affiliated with or endorsed by ECTIVE. The BLE protocol described here is an
