@@ -65,6 +65,21 @@
   .p400 .tile{border-radius:4px;padding:3px 8px;border-width:1px;} .p400 .tile .k{font-size:8px;} .p400 .tile .v{font-size:18px;} .p400 .tile .v small{font-size:10px;}
   .p400 .chart .lbl{font-size:8px;}
 
+  /* ---------- 264 x 176  (2.7") ---------- */
+  /* No daily bars at this height — spend the room on the now-block + a real
+     sparkline; the overnight figure rides in the sparkline's label instead. */
+  .p264 { width:264px; height:176px; padding:7px 8px;
+          display:grid; grid-template-rows:auto 78px 1fr; gap:4px; }
+  .p264 header{padding-bottom:3px;} .p264 .name{font-size:12px;} .p264 .upd{font-size:8px;}
+  .p264 .now{display:grid;grid-template-columns:88px 1fr;gap:7px;min-height:0;}
+  .p264 .pct{font-size:34px;} .p264 .pct small{font-size:14px;}
+  .p264 .ah{font-size:8px;margin-top:1px;} .p264 .bat{width:80px;height:12px;margin-top:4px;border-width:2px;border-radius:2px;}
+  .p264 .bat::after{right:-5px;top:3px;width:3px;height:6px;}
+  .p264 .st{font-size:11px;margin-top:4px;}
+  .p264 .tiles{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:4px;}
+  .p264 .tile{border-radius:3px;padding:2px 6px;border-width:1px;} .p264 .tile .k{font-size:7px;} .p264 .tile .v{font-size:15px;} .p264 .tile .v small{font-size:8px;}
+  .p264 .chart .lbl{font-size:8px;}
+
   /* ---------- 250 x 122  (2.13") ---------- */
   .p250 { width:250px; height:122px; padding:6px 8px; display:flex; flex-direction:column; gap:3px; }
   .p250 .main { flex:1; display:flex; gap:8px; min-height:0; }
@@ -81,7 +96,7 @@
 </head>
 <body>
   <div class="intro">
-    <b>e-ink size preview.</b> The same live data, rendered at three candidate panel resolutions in
+    <b>e-ink size preview.</b> The same live data, rendered at four candidate panel resolutions in
     true <b>1-bit black &amp; white</b> (what a mono e-paper actually shows — no greys), each at
     1&nbsp;pixel-per-pixel so the physical size is roughly honest. Scroll down to the small ones and
     ask: <i>is “will we make it to morning?” still legible here?</i>
@@ -132,6 +147,29 @@
       </div>
       <div class="chart"><div class="lbl"><span>48 h · SoC</span></div><svg id="spark_400"></svg></div>
       <div class="chart"><div class="lbl"><span>Daily net Ah</span><span>night ▼ <span id="ln_400">–</span></span></div><svg id="bars_400"></svg></div>
+    </div>
+  </div>
+
+  <!-- 264 x 176 -->
+  <div class="device">
+    <div class="cap"><b>264 × 176</b> · 2.7″ · Waveshare 2.7″ HAT — in hand</div>
+    <div class="panel p264">
+      <header><span class="name">batterijtje</span><span class="upd" id="upd_264">…</span></header>
+      <div class="now">
+        <div class="soc">
+          <div class="pct"><span id="soc_264">–</span><small>%</small></div>
+          <div class="ah"><span id="ah_264">—</span> Ah</div>
+          <div class="bat"><i id="bat_264" style="width:0"></i></div>
+          <div class="st" id="state_264">–</div>
+        </div>
+        <div class="tiles">
+          <div class="tile"><div class="k">Current</div><div class="v" id="curr_264">–</div></div>
+          <div class="tile"><div class="k">Voltage</div><div class="v" id="volt_264">–</div></div>
+          <div class="tile"><div class="k">Power</div><div class="v" id="pow_264">–</div></div>
+          <div class="tile"><div class="k" id="rtk_264">To empty</div><div class="v" id="rt_264">–</div></div>
+        </div>
+      </div>
+      <div class="chart"><div class="lbl"><span>48 h · SoC</span><span>last night ▼ <span id="ln_264">–</span> Ah</span></div><svg id="spark_264"></svg></div>
     </div>
   </div>
 
@@ -216,7 +254,7 @@ async function refresh(){
     const cur=Math.abs(L.current).toFixed(2), pw=Math.abs(L.power), rt=fmtDur(L.rt_hours,L.rt_min);
     const age=now-L.ts, u=(age>180?`stale · ${agoStr(age)}`:`updated ${agoStr(age)} ago`)+(L.synced===0?' · ⚠ clock':'');
 
-    ['800','400'].forEach(s=>{
+    ['800','400','264'].forEach(s=>{
       S('soc_'+s,L.soc); S('ah_'+s,L.remaining_ah);
       const b=$('bat_'+s); if(b) b.style.width=Math.max(0,Math.min(100,L.soc))+'%';
       H('curr_'+s,`${arw}${cur}<small>A</small>`);
@@ -238,6 +276,7 @@ async function refresh(){
   }
   drawSpark('spark_800',800,64,d.series,now);
   drawSpark('spark_400',400,54,d.series,now);
+  drawSpark('spark_264',264,48,d.series,now);
   drawSpark('spark_250',250,20,d.series,now,{tiny:true});
   drawBars('bars_800',800,84,d.daily);
   drawBars('bars_400',400,52,d.daily,{small:true});
