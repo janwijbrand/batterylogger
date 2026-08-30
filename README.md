@@ -9,16 +9,12 @@ and keeps the history the vendor app throws away.*
 > binary from the same data as the web view and repainted every 10 minutes. The
 > DS3231 RTC (top-right) keeps the clock across power-cuts.
 
-![The batterijtje browser dashboard](docs/dashboard.png)
-
-> The same design in the browser, where it's tuned — a monochrome layout that ports
-> straight to the panel. *(Screenshot shows representative data.)*
-
-An always-on logger + dashboard for the LiFePO4 battery in a campervan
+An always-on logger + e-ink dashboard for the LiFePO4 battery in a campervan
 (**ECTIVE Accubox 120S** power station). It polls the battery's BLE BMS, stores
-history in SQLite, and serves a small e-ink-style web dashboard — building the
-intuition for real-world off-grid usage (daily Ah, overnight drain, solar yield)
-that the battery's own app throws away.
+history in SQLite, and renders a compact dashboard onto the e-ink panel —
+building the intuition for real-world off-grid usage (daily Ah, overnight drain,
+solar yield) that the battery's own app throws away. There's no always-on web UI;
+for a remote look, the renderer dumps the current frame to a PNG on demand.
 
 See [`van-battery-logger-brief.md`](van-battery-logger-brief.md) for the original
 project brief and [`CLAUDE.md`](CLAUDE.md) for the short "read before editing" notes.
@@ -35,14 +31,14 @@ Notable changes are tracked in [`CHANGES.md`](CHANGES.md).
 ## Architecture
 
 ```
-logger.py   — BLE poll every 15 s (poll-and-disconnect) → append SQLite (WAL)
-webapp.py   — Flask, read-only DB → JSON API + dashboard on :8080
-web/index.html — single 800×480 panel (e-ink prototype), auto-refresh 10 s
+logger.py         — BLE poll every 15 s (poll-and-disconnect) → append SQLite (WAL)
+eink/batteryeink  — Go: read SQLite (read-only) → render 264×176 → paint e-Paper HAT
 ```
 
-Both run as systemd services (`batterylogger`, `batteryweb`), enabled on boot,
-`Restart=always`. The dashboard opens the DB read-only, so it never blocks the
-logger (WAL allows one writer + concurrent readers).
+`batterylogger.service` runs the logger (boot-enabled, `Restart=always`);
+`batteryeink.timer` repaints the panel every 10 min. The renderer opens the DB
+read-only, so it never blocks the logger (WAL allows one writer + concurrent
+readers). A `wifi-watchdog` daemon keeps the Pi reachable for remote access.
 
 ## The BLE protocol (reverse-engineered)
 
@@ -75,42 +71,48 @@ Not documented publicly for the Accubox; recovered by decompiling the ECTIVE
 ```
 batterylogger/
   logger.py            BLE → SQLite logger
-  webapp.py            Flask dashboard backend (fallback; superseded by webserver/)
-  webserver/           batteryweb-go — Go dashboard server (:8080), the live one
   eink/                batteryeink — Go renderer for the 2.7" e-Paper HAT
-  web/index.html       dashboard (self-contained, no CDN)
-  requirements.txt     pip deps (installed into the Pi venv)
-  deploy.sh            scp code to the Pi + restart services
-  systemd/             unit files (logger, web, wifi-watchdog, eink timer, ...)
+  requirements.txt     pip deps for the logger (installed into the Pi venv)
+  deploy.sh            scp the logger to the Pi + restart it
+  systemd/             unit files (logger, wifi-watchdog, eink service + timer, ...)
 van-battery-logger-brief.md   original brief
 handoff-0*.md          design suggestions (assessed; most applied)
 ```
 
-The two Go binaries are pure-Go and cross-compile to the Pi Zero's ARMv6 with
-no toolchain (`CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=6`); see each dir's
-`build.sh`. `batteryeink` fetches `/api/data` from the local server, draws a
-264×176 1-bit frame, and drives the panel over SPI (`periph.io`), repainting on
-a systemd timer.
+`batteryeink` is pure Go and cross-compiles to the Pi Zero's ARMv6 with no
+toolchain (`CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=6`; see `eink/build.sh`).
+It reads the SQLite DB read-only (pure-Go `modernc.org/sqlite`), draws a 264×176
+4-grey frame, and drives the panel over SPI (`periph.io`), repainting on a
+systemd timer. `./batteryeink -nopaint -png out.png` dumps the current frame for
+a remote look. (An earlier Flask/Go **web** dashboard was retired once the e-ink
+renderer became self-sufficient; it lives in git history.)
 
 ## Setup (fresh Pi)
 
 ```bash
 # System deps
 sudo apt update && sudo apt full-upgrade
-sudo raspi-config nonint do_spi 0            # SPI for the future e-ink HAT
-sudo apt install -y rfkill iw wireless-tools fake-hwclock
+sudo raspi-config nonint do_spi 0            # SPI for the e-ink HAT
+sudo raspi-config nonint do_i2c 0            # I²C for the DS3231 RTC
+sudo apt install -y rfkill iw wireless-tools i2c-tools
+echo "dtoverlay=i2c-rtc,ds3231" | sudo tee -a /boot/firmware/config.txt   # RTC
 
-# Python env
+# Python env (just the BLE logger)
 python3 -m venv ~/batterylogger/venv
 ~/batterylogger/venv/bin/pip install -r requirements.txt
 
 # WiFi power-save off (shared radio → BLE reliability); see docs
 
+# Build + copy the e-ink renderer (from a dev machine with Go):
+( cd batterylogger/eink && ./build.sh )
+scp batterylogger/eink/batteryeink $USER@host:~/batterylogger/
+
 # Install services (substitute your Pi user for the __USER__ placeholder):
-for u in batterylogger batteryweb; do
+for u in batterylogger wifi-watchdog batteryeink; do
   sed "s/__USER__/$USER/g" systemd/$u.service | sudo tee /etc/systemd/system/$u.service >/dev/null
 done
-sudo systemctl enable --now batterylogger batteryweb
+sudo cp systemd/batteryeink.timer /etc/systemd/system/
+sudo systemctl enable --now batterylogger wifi-watchdog batteryeink.timer
 ```
 
 ## Deploy changes
@@ -125,10 +127,10 @@ cd batterylogger && ./deploy.sh user@hostname.local   # or: export DEPLOY_TARGET
   terminal; gross solar vs gross load cannot be separated in software. Daily bars
   are *net*. The overnight window (22:00–06:00, when nothing charges) is the clean
   "will we make it to morning?" figure.
-- **Timestamps are UTC epoch** in the DB; the web layer localises with
-  `LOCAL_TZ = Europe/Amsterdam`.
-- **No RTC**: `fake-hwclock` keeps the clock roughly right across power cuts and
-  each sample carries a `synced` flag. A DS3231 on I²C is the planned proper fix.
+- **Timestamps are UTC epoch** in the DB; the renderer localises to
+  `Europe/Amsterdam` for the overnight-window figure.
+- **DS3231 RTC** on I²C (`dtoverlay=i2c-rtc,ds3231`) keeps the clock correct
+  across power-cuts on its coin cell; each sample still carries a `synced` flag.
 
 ## Status / roadmap
 

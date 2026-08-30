@@ -12,6 +12,22 @@ Data timestamps are UTC; the dates below are local (Europe/Amsterdam).
 
 Working toward 1.0.
 
+### 2026-08-30 — e-ink goes standalone; web dashboard retired
+
+**Changed**
+- **`batteryeink` now reads `battery.db` directly** (read-only, pure-Go
+  `modernc.org/sqlite`) instead of fetching `/api/data` over HTTP — so the e-ink
+  panel no longer needs a running server.
+
+**Removed**
+- The **web dashboard** (`webapp.py` / `batteryweb-go` / `web/index.html` and the
+  `batteryweb` service) — no longer needed now that the panel is the display and
+  the renderer is self-sufficient. For a remote look, `batteryeink -nopaint -png`
+  dumps the current frame. (All recoverable from git history.)
+
+The running setup is now just: `batterylogger` (BLE→SQLite), `batteryeink.timer`
+(paint the panel), and `wifi-watchdog` (keep the Pi reachable).
+
 ### 2026-08-30 — real hardware: RTC + e-ink dashboard
 
 **Added**
