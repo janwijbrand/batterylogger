@@ -382,6 +382,60 @@ func Bilevel(img *image.Gray) *image.Gray {
 	return out
 }
 
+// grayLevel quantizes an 8-bit gray to one of 4 panel levels:
+// 0=black, 1=dark grey, 2=light grey, 3=white. Boundaries are the midpoints
+// between the canonical values 0x00 / 0x80 / 0xC0 / 0xFF.
+func grayLevel(y uint8) int {
+	switch {
+	case y < 64:
+		return 0
+	case y < 160:
+		return 1
+	case y < 224:
+		return 2
+	default:
+		return 3
+	}
+}
+
+var levelValue = [4]uint8{0x00, 0x80, 0xC0, 0xFF}
+
+// GetBuffers4Gray packs the rendered image into the two 1-bit RAM planes the
+// 4-grey mode needs. plane1 bit set for black|light-grey; plane2 for
+// black|dark-grey. Same rotation/bit-order as the mono GetBuffer.
+func GetBuffers4Gray(img *image.Gray) (p1, p2 []byte) {
+	p1 = make([]byte, bufLen)
+	p2 = make([]byte, bufLen)
+	for y := 0; y < epdWidth; y++ { // 0..175
+		for x := 0; x < epdHeight; x++ { // 0..263
+			lvl := grayLevel(img.GrayAt(x, y).Y)
+			newy := epdHeight - x - 1
+			idx := (y + newy*epdWidth) / 8
+			mask := byte(0x80 >> uint(y%8))
+			if lvl == 0 || lvl == 2 { // black or light grey
+				p1[idx] |= mask
+			}
+			if lvl == 0 || lvl == 1 { // black or dark grey
+				p2[idx] |= mask
+			}
+		}
+	}
+	return
+}
+
+// Quantize4 maps every pixel to its 4-level canonical grey — i.e. exactly what
+// the 4-grey panel will show. Handy for debug PNGs.
+func Quantize4(img *image.Gray) *image.Gray {
+	b := img.Bounds()
+	out := image.NewGray(b)
+	for y := b.Min.Y; y < b.Max.Y; y++ {
+		for x := b.Min.X; x < b.Max.X; x++ {
+			out.SetGray(x, y, color.Gray{Y: levelValue[grayLevel(img.GrayAt(x, y).Y)]})
+		}
+	}
+	return out
+}
+
 // ScaleNN nearest-neighbor upscales (so debug PNGs show real pixels, unsmoothed).
 func ScaleNN(img *image.Gray, n int) *image.Gray {
 	if n <= 1 {
