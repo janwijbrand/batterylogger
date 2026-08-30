@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: MIT
 
 // batteryeink — renders the AccuBox dashboard from /api/data to the 2.7" e-Paper
-// HAT (V2). One-shot: fetch, draw a 264x176 1-bit frame, push it, sleep. Meant
-// to be run periodically by a systemd timer.
+// HAT (V2). One-shot: fetch, draw a 264x176 frame, push it, sleep. Meant to be
+// run periodically by a systemd timer. Default is 4-grey; -mono forces 1-bit.
 package main
 
 import (
 	"flag"
+	"image"
 	"image/png"
 	"log"
 	"os"
@@ -22,6 +23,7 @@ func main() {
 	scale := flag.Int("scale", 1, "nearest-neighbor upscale factor for the debug PNG")
 	noPaint := flag.Bool("nopaint", false, "render/preview only; don't touch the panel")
 	flashMode := flag.Bool("flash", false, "run a b/w flash test instead of the dashboard")
+	mono := flag.Bool("mono", false, "1-bit black/white instead of 4-grey")
 	flag.Parse()
 
 	// Render the dashboard image first (needs no hardware).
@@ -32,11 +34,17 @@ func main() {
 	img := RenderDashboard(data, ferr)
 
 	if *pngPath != "" {
+		var preview *image.Gray
+		if *mono {
+			preview = Bilevel(img)
+		} else {
+			preview = Quantize4(img)
+		}
 		f, err := os.Create(*pngPath)
 		if err != nil {
 			log.Fatalf("png: %v", err)
 		}
-		if err := png.Encode(f, ScaleNN(Bilevel(img), *scale)); err != nil {
+		if err := png.Encode(f, ScaleNN(preview, *scale)); err != nil {
 			log.Fatalf("png encode: %v", err)
 		}
 		f.Close()
@@ -56,17 +64,24 @@ func main() {
 		log.Fatalf("epd: %v", err)
 	}
 	defer e.Close()
-	e.Init()
-
-	if *flashMode {
-		flashTest(e)
-		return
-	}
 
 	t := time.Now()
-	e.Display(GetBufferFromImage(img))
-	e.Sleep()
-	log.Printf("dashboard painted (%.2fs)", time.Since(t).Seconds())
+	switch {
+	case *flashMode:
+		e.Init()
+		flashTest(e)
+	case *mono:
+		e.Init()
+		e.Display(GetBufferFromImage(img))
+		e.Sleep()
+		log.Printf("dashboard painted (mono, %.2fs)", time.Since(t).Seconds())
+	default:
+		e.Init4Gray()
+		p1, p2 := GetBuffers4Gray(img)
+		e.Display4Gray(p1, p2)
+		e.Sleep()
+		log.Printf("dashboard painted (4-grey, %.2fs)", time.Since(t).Seconds())
+	}
 }
 
 func flashTest(e *EPD) {

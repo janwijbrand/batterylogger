@@ -131,7 +131,7 @@ cd batterylogger && ./deploy.sh user@hostname.local   # or: export DEPLOY_TARGET
 - [x] Net labelling, overnight-load metric, trapezoidal integration, gap accounting
 - [x] DS3231 RTC on I²C (`dtoverlay=i2c-rtc,ds3231`; retired `fake-hwclock`)
 - [x] E-ink render to a Waveshare 2.7″ HAT — `batteryeink` (Go), on a 10-min timer
-- [ ] Grayscale (4-level) e-ink rendering for smoother text
+- [x] Grayscale (4-level) e-ink rendering for smoother text (`-mono` for 1-bit)
 - [ ] Move development to the spare Pi 3
 
 ## License
