@@ -27,12 +27,16 @@ Working toward 1.0.
 - **`batteryeink.timer`** — repaints the panel every 10 min (one-shot service;
   ~3.4 s per refresh, zero idle footprint).
 
+- **4-grey rendering**: text is anti-aliased into the panel's 4 grey levels
+  (ported `Init_4Gray` + its LUT + a dual-plane `0x24`/`0x26` write) for
+  noticeably smoother glyphs; `-mono` forces 1-bit. 4-grey refresh ~8 s.
+
 **Notes**
 - The RTC sits on the header corner (pins 1–6); the display connects via its
   8-pin cable to the SPI + control pins, so the two coexist with no pin overlap.
 - The e-ink layout mirrors the 264×176 web preview: big SoC, battery bar,
   charge/consume state, Current/Voltage/Power/Time tiles, and a 48 h SoC
-  sparkline. Grayscale (the panel does 4 levels) is a planned refinement.
+  sparkline.
 
 ### 2026-07-25 — resilience & a Go rewrite
 
