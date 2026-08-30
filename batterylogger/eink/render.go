@@ -10,6 +10,7 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
+	"time"
 
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/gofont/gobold"
@@ -166,17 +167,6 @@ func textRight(img *image.Gray, fc font.Face, xr, top int, s string) {
 
 // --- formatting ---
 
-func ageStr(sec int64) string {
-	switch {
-	case sec < 90:
-		return fmt.Sprintf("%ds", sec)
-	case sec < 5400:
-		return fmt.Sprintf("%dm", sec/60)
-	default:
-		return fmt.Sprintf("%.0fh", float64(sec)/3600)
-	}
-}
-
 func durShort(h, m int) string {
 	switch {
 	case h >= 48:
@@ -212,15 +202,14 @@ func RenderDashboard(d *APIData, ferr error) *image.Gray {
 
 	L := d.Latest
 	chg := L.Direction == 0
-	age := d.Now - L.TS
-	upd := "upd " + ageStr(age)
-	if age > 180 {
-		upd = "STALE " + ageStr(age)
-	}
+	// e-ink holds the frame for ~10 min, so a relative "20s ago" would freeze and
+	// mislead — show the sample's wall-clock time (always accurate; an old time is
+	// itself the staleness signal).
+	stamp := time.Unix(L.TS, 0).In(loc).Format("15:04")
 	if L.Synced == 0 {
-		upd += " !clk"
+		stamp += " ?clk"
 	}
-	textRight(img, fTiny, W-5, 6, upd)
+	textRight(img, fTiny, W-5, 6, stamp)
 	hline(img, 3, W-4, 22)
 
 	// ---- left column: SoC hero ----
