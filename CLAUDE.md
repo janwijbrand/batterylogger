@@ -4,9 +4,12 @@ See @van-battery-logger-brief.md.
 
 ## Where it runs
 Everything lives on the Pi Zero (`username@hostname.local`) under `~/batterylogger/`:
-`logger.py` (BLE poll → SQLite), `webapp.py` + `web/index.html` (Flask dashboard, port 8080),
-`battery.db` (SQLite/WAL). systemd units: `batterylogger.service`, `batteryweb.service`.
-Dev happens off-box; deploy with `scp` then `systemctl restart`.
+`logger.py` (BLE poll → SQLite), `batteryeink` (Go: reads SQLite → paints the 2.7"
+e-Paper HAT), `battery.db` (SQLite/WAL). systemd units: `batterylogger.service`,
+`batteryeink.timer`, `wifi-watchdog.service`. A DS3231 RTC keeps the clock across
+power-cuts. (An earlier Flask/Go web dashboard on :8080 was retired — the panel is
+the display now; `batteryeink -nopaint -png` gives a remote look.) Dev happens
+off-box; deploy the logger with `scp`, the Go binary via `eink/build.sh` + `scp`.
 
 ## Data notes (read before "fixing" these)
 - **Net measurement, by design.** The AccuBox exposes **one** current at the battery

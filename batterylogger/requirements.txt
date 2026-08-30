@@ -1,5 +1,5 @@
 # Installed into the Pi's venv (piwheels provides ARMv6 wheels).
-# Pillow for the future e-ink render comes from apt (python3-pil), not here.
+# The dashboard + e-ink render are Go now (see webserver history / eink/); the
+# only Python left is the BLE logger, which just needs bleak.
 bleak
 aiobmsble
-flask

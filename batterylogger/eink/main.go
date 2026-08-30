@@ -18,7 +18,7 @@ import (
 )
 
 func main() {
-	apiURL := flag.String("api", "http://localhost:8080/api/data", "dashboard JSON endpoint")
+	dbFlag := flag.String("db", "", "path to battery.db (default: alongside the binary)")
 	pngPath := flag.String("png", "", "also write the rendered frame to this PNG (debug)")
 	scale := flag.Int("scale", 1, "nearest-neighbor upscale factor for the debug PNG")
 	noPaint := flag.Bool("nopaint", false, "render/preview only; don't touch the panel")
@@ -26,10 +26,15 @@ func main() {
 	mono := flag.Bool("mono", false, "1-bit black/white instead of 4-grey")
 	flag.Parse()
 
-	// Render the dashboard image first (needs no hardware).
-	data, ferr := FetchData(*apiURL)
+	dbFile := *dbFlag
+	if dbFile == "" {
+		dbFile = defaultDBPath()
+	}
+
+	// Render the dashboard image first (needs no hardware) — read the DB directly.
+	data, ferr := LoadData(dbFile)
 	if ferr != nil {
-		log.Printf("fetch: %v (rendering offline frame)", ferr)
+		log.Printf("db: %v (rendering offline frame)", ferr)
 	}
 	img := RenderDashboard(data, ferr)
 
