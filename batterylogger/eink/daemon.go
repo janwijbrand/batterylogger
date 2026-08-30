@@ -37,6 +37,13 @@ func RunDaemon(dbFile string) error {
 
 	winIdx := 1 // default 48h
 	infoView := false
+
+	// Default WiFi off on a fresh boot; the user enables it deliberately with
+	// KEY3. Keyed on boot (not daemon restart) so redeploys don't cut access.
+	if freshBoot() {
+		log.Println("fresh boot: defaulting WiFi off")
+		setWifi(false)
+	}
 	wifiOff := !wifiEnabled()
 
 	events := make(chan KeyEvent, 8)
@@ -125,6 +132,18 @@ func RunDaemon(dbFile string) error {
 }
 
 // --- WiFi (radio only; Bluetooth/BLE untouched) ---
+
+// freshBoot reports whether we're within a few minutes of a boot (so the WiFi
+// default-off should apply). Uses uptime so a mid-session daemon restart is safe.
+func freshBoot() bool {
+	b, err := os.ReadFile("/proc/uptime")
+	if err != nil {
+		return false
+	}
+	var up float64
+	fmt.Sscanf(string(b), "%f", &up)
+	return up < 180
+}
 
 func wifiEnabled() bool {
 	out, err := exec.Command("nmcli", "radio", "wifi").Output()
