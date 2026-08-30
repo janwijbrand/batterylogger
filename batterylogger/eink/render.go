@@ -210,9 +210,11 @@ func RenderDashboard(d *APIData, ferr error) *image.Gray {
 		stamp += " ?clk"
 	}
 	textRight(img, fTiny, W-5, 6, stamp)
+	wifiTag := "· wifi on"
 	if d.WifiOff {
-		textTop(img, fTiny, 5+textW(fTitle, "batterijtje")+8, 8, "· wifi off")
+		wifiTag = "· wifi off"
 	}
+	textTop(img, fTiny, 5+textW(fTitle, "batterijtje")+8, 8, wifiTag)
 	hline(img, 3, W-4, 22)
 
 	// ---- left column: SoC hero ----
