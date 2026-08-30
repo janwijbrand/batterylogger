@@ -1,0 +1,15 @@
+# AccuBox e-ink dashboard renderer (one-shot; triggered by batteryeink.timer).
+# Fetches /api/data from the local dashboard and paints the 2.7" e-Paper HAT.
+# Install: sed "s/__USER__/$USER/g" systemd/batteryeink.service | sudo tee /etc/systemd/system/batteryeink.service
+[Unit]
+Description=AccuBox e-ink dashboard render (one-shot)
+After=network-online.target batteryweb.service
+Wants=batteryweb.service
+
+[Service]
+Type=oneshot
+User=__USER__
+# SPI (/dev/spidev0.0) + GPIO (/dev/gpiomem) access
+SupplementaryGroups=gpio spi
+ExecStart=/home/__USER__/batterylogger/batteryeink
+Nice=5

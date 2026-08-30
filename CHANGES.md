@@ -12,6 +12,28 @@ Data timestamps are UTC; the dates below are local (Europe/Amsterdam).
 
 Working toward 1.0.
 
+### 2026-08-30 — real hardware: RTC + e-ink dashboard
+
+**Added**
+- **DS3231 real-time clock** (Adafruit PiRTC) on I²C, via
+  `dtoverlay=i2c-rtc,ds3231`. Verified it holds time on its coin cell across a
+  full power-cut, so the clock is correct at boot before NTP — the proper fix
+  for the Pi Zero's lack of an RTC. Retired `fake-hwclock` in its favour.
+- **`batteryeink`** — a second single static ARMv6 Go binary that renders the
+  dashboard to a **Waveshare 2.7″ e-Paper HAT (V2, 264×176)**. Pure Go: it
+  fetches `/api/data` from the local server, draws a 1-bit frame, and drives the
+  panel over SPI — its own ported mono driver (`periph.io` for SPI/GPIO, no cgo,
+  no Python). Cross-compiles from a laptop like `batteryweb-go`.
+- **`batteryeink.timer`** — repaints the panel every 10 min (one-shot service;
+  ~3.4 s per refresh, zero idle footprint).
+
+**Notes**
+- The RTC sits on the header corner (pins 1–6); the display connects via its
+  8-pin cable to the SPI + control pins, so the two coexist with no pin overlap.
+- The e-ink layout mirrors the 264×176 web preview: big SoC, battery bar,
+  charge/consume state, Current/Voltage/Power/Time tiles, and a 48 h SoC
+  sparkline. Grayscale (the panel does 4 levels) is a planned refinement.
+
 ### 2026-07-25 — resilience & a Go rewrite
 
 **Added**

@@ -1,0 +1,14 @@
+# Repaint the e-ink dashboard periodically. Change OnUnitActiveSec to 5min for
+# a faster cadence (feasible; the panel just flashes on each repaint).
+# Install: cp systemd/batteryeink.timer /etc/systemd/system/ && systemctl enable --now batteryeink.timer
+[Unit]
+Description=Repaint the AccuBox e-ink dashboard every 10 min
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=10min
+AccuracySec=30s
+Persistent=false
+
+[Install]
+WantedBy=timers.target
