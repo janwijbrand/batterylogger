@@ -205,7 +205,7 @@ func RenderDashboard(d *APIData, ferr error) *image.Gray {
 	// e-ink holds the frame for ~10 min, so a relative "20s ago" would freeze and
 	// mislead — show the sample's wall-clock time (always accurate; an old time is
 	// itself the staleness signal).
-	stamp := time.Unix(L.TS, 0).In(loc).Format("15:04")
+	stamp := time.Unix(L.TS, 0).In(loc).Format("2006/01/02 15:04")
 	if L.Synced == 0 {
 		stamp += " ?clk"
 	}
