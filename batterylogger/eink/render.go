@@ -210,6 +210,9 @@ func RenderDashboard(d *APIData, ferr error) *image.Gray {
 		stamp += " ?clk"
 	}
 	textRight(img, fTiny, W-5, 6, stamp)
+	if d.WifiOff {
+		textTop(img, fTiny, 5+textW(fTitle, "batterijtje")+8, 8, "· wifi off")
+	}
 	hline(img, 3, W-4, 22)
 
 	// ---- left column: SoC hero ----
@@ -280,7 +283,7 @@ func RenderDashboard(d *APIData, ferr error) *image.Gray {
 	}
 
 	// ---- sparkline: 48h SoC ----
-	textTop(img, fTiny, 6, 107, "48h SoC")
+	textTop(img, fTiny, 6, 107, windowLabel(d.WindowHours))
 	night := "night –"
 	if d.LastNight != nil {
 		night = fmt.Sprintf("night %d Ah", d.LastNight.OutAh)
@@ -293,7 +296,11 @@ func RenderDashboard(d *APIData, ferr error) *image.Gray {
 	dottedHLine(img, px0, px1, (py0+py1)/2)
 	dottedHLine(img, px0, px1, py1)
 	if len(d.Series) > 0 {
-		t0 := d.Now - 48*3600
+		win := d.WindowHours
+		if win <= 0 {
+			win = 48
+		}
+		t0 := d.Now - int64(win)*3600
 		t1 := d.Now
 		span := float64(t1 - t0)
 		if span < 1 {
@@ -318,6 +325,44 @@ func RenderDashboard(d *APIData, ferr error) *image.Gray {
 		textTop(img, fTiny, px0+4, (py0+py1)/2-4, "collecting...")
 	}
 
+	return img
+}
+
+// windowLabel names the sparkline span: 24->"24h SoC", 48->"48h SoC", 168->"7d SoC".
+func windowLabel(h int) string {
+	if h <= 0 {
+		h = 48
+	}
+	if h >= 168 {
+		return fmt.Sprintf("%dd SoC", h/24)
+	}
+	return fmt.Sprintf("%dh SoC", h)
+}
+
+// RenderSysInfo draws the KEY4 system-info screen.
+func RenderSysInfo(lines []string) *image.Gray {
+	img := image.NewGray(image.Rect(0, 0, W, H))
+	draw.Draw(img, img.Bounds(), image.NewUniform(color.Gray{Y: 255}), image.Point{}, draw.Src)
+	rectOutline(img, 0, 0, W-1, H-1)
+	textTop(img, fTitle, 5, 3, "system")
+	hline(img, 3, W-4, 22)
+	y := 30
+	for _, ln := range lines {
+		textTop(img, fSmall, 8, y, ln)
+		y += 21
+	}
+	hline(img, 3, W-4, H-21)
+	textTop(img, fTiny, 6, H-17, "hold KEY4 3s = power off  ·  tap KEY4 = back")
+	return img
+}
+
+// RenderMessage draws a centred two-line message (e.g. "powering off").
+func RenderMessage(big, small string) *image.Gray {
+	img := image.NewGray(image.Rect(0, 0, W, H))
+	draw.Draw(img, img.Bounds(), image.NewUniform(color.Gray{Y: 255}), image.Point{}, draw.Src)
+	rectOutline(img, 0, 0, W-1, H-1)
+	textTop(img, fBig, (W-textW(fBig, big))/2, 45, big)
+	textTop(img, fSmall, (W-textW(fSmall, small))/2, 110, small)
 	return img
 }
 

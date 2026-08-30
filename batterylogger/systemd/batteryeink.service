@@ -1,14 +1,20 @@
-# AccuBox e-ink dashboard renderer (one-shot; triggered by batteryeink.timer).
-# Reads battery.db directly and paints the 2.7" e-Paper HAT. No webserver needed.
+# AccuBox e-ink dashboard daemon: paints the 2.7" e-Paper HAT periodically and
+# on the 4 HAT buttons (KEY1 refresh · KEY2 window · KEY3 wifi · KEY4 info/off).
+# Reads battery.db directly. Needs passwordless sudo for the KEY3/KEY4 actions.
 # Install: sed "s/__USER__/$USER/g" systemd/batteryeink.service | sudo tee /etc/systemd/system/batteryeink.service
 [Unit]
-Description=AccuBox e-ink dashboard render (one-shot)
+Description=AccuBox e-ink dashboard daemon
 After=batterylogger.service
 
 [Service]
-Type=oneshot
+Type=simple
 User=__USER__
 # SPI (/dev/spidev0.0) + GPIO (/dev/gpiomem) access
 SupplementaryGroups=gpio spi
-ExecStart=/home/__USER__/batterylogger/batteryeink
+ExecStart=/home/__USER__/batterylogger/batteryeink -daemon
+Restart=always
+RestartSec=5
 Nice=5
+
+[Install]
+WantedBy=multi-user.target

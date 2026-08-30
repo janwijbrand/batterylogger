@@ -32,19 +32,26 @@ Notable changes are tracked in [`CHANGES.md`](CHANGES.md).
   the Accubox's own USB-A port — so the logger shows up in its own data as a ~1 W load.
 - Battery: ECTIVE LC-series LiFePO4 with a Topband BLE BMS.
 - **Waveshare 2.7" e-Paper HAT** (264×176, V2) over SPI + a **DS3231 RTC** on I²C —
-  both installed, driven by the `batteryeink` Go renderer on a 10-minute timer.
+  both installed, driven by the `batteryeink` Go daemon. The HAT's 4 buttons are
+  wired too (KEY1–4 = BCM 5/6/13/19).
 
 ## Architecture
 
 ```
 logger.py         — BLE poll every 15 s (poll-and-disconnect) → append SQLite (WAL)
-eink/batteryeink  — Go: read SQLite (read-only) → render 264×176 → paint e-Paper HAT
+eink/batteryeink  — Go daemon: read SQLite (read-only) → render 264×176 → e-Paper HAT
 ```
 
 `batterylogger.service` runs the logger (boot-enabled, `Restart=always`);
-`batteryeink.timer` repaints the panel every 10 min. The renderer opens the DB
-read-only, so it never blocks the logger (WAL allows one writer + concurrent
-readers). A `wifi-watchdog` daemon keeps the Pi reachable for remote access.
+`batteryeink.service` is a daemon that repaints the panel every 10 min **and** on
+the HAT's 4 buttons. The renderer opens the DB read-only, so it never blocks the
+logger (WAL allows one writer + concurrent readers). A `wifi-watchdog` daemon
+keeps the Pi reachable for remote access.
+
+**Buttons:** **KEY1** force-refresh · **KEY2** cycle the sparkline window
+(24 h / 48 h / 7 d) · **KEY3** WiFi on/off (radio only — Bluetooth/BLE keep
+running; pauses the watchdog while off) · **KEY4** tap = system-info screen,
+hold 3 s = graceful power-off.
 
 ## The BLE protocol (reverse-engineered)
 
@@ -121,9 +128,11 @@ sudo install -m 755 systemd/wifi-watchdog.sh /usr/local/sbin/   # watchdog daemo
 for u in batterylogger wifi-watchdog batteryeink; do
   sed "s/__USER__/$USER/g" systemd/$u.service | sudo tee /etc/systemd/system/$u.service >/dev/null
 done
-sudo cp systemd/batteryeink.timer /etc/systemd/system/
-sudo systemctl enable --now batterylogger wifi-watchdog batteryeink.timer
+sudo systemctl enable --now batterylogger wifi-watchdog batteryeink
 ```
+
+(The KEY3/KEY4 button actions need passwordless `sudo` for the `batteryeink`
+user — `nmcli radio wifi`, `systemctl` on the watchdog, and `poweroff`.)
 
 ## Deploy changes
 
@@ -152,8 +161,8 @@ cd batterylogger && ./deploy.sh user@hostname.local   # or: export DEPLOY_TARGET
 - [x] Grayscale (4-level) e-ink rendering for smoother text (`-mono` for 1-bit)
 - [x] E-ink reads SQLite directly; web dashboard retired (renderer is self-sufficient)
 - [ ] Re-verify the coin-cell backup after the RTC solder rework
+- [x] Utilise the 4 HAT buttons (refresh · window · WiFi · info/power-off)
 - [ ] 3D-printed housing
-- [ ] Utilise the 4 HAT buttons (KEY1–4)
 - [ ] Log a full multi-day off-grid trip → tag **1.0**
 - [ ] Move development to the spare Pi 3
 

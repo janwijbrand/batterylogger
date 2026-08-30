@@ -57,10 +57,12 @@ type Night struct {
 
 // APIData is what the renderer needs (kept as a struct so render.go is unchanged).
 type APIData struct {
-	Now       int64
-	Latest    *Latest
-	Series    []SeriesPt
-	LastNight *Night
+	Now         int64
+	Latest      *Latest
+	Series      []SeriesPt
+	LastNight   *Night
+	WindowHours int  // sparkline span (24 / 48 / 168)
+	WifiOff     bool // set by the daemon, for the on-screen indicator
 }
 
 // defaultDBPath looks for battery.db next to the binary (matches the deploy).
@@ -72,9 +74,13 @@ func defaultDBPath() string {
 }
 
 // LoadData reads the dashboard figures straight from the logger's SQLite DB
-// (read-only, WAL-safe) — no HTTP, no webserver. Mirrors the subset of
-// batteryweb-go's /api/data that the e-ink layout uses.
-func LoadData(path string) (*APIData, error) {
+// (read-only, WAL-safe) — no HTTP, no webserver. windowHours sets the sparkline
+// span (e.g. 24 / 48 / 168). Mirrors the subset of batteryweb-go's /api/data
+// that the e-ink layout uses.
+func LoadData(path string, windowHours int) (*APIData, error) {
+	if windowHours <= 0 {
+		windowHours = 48
+	}
 	db, err := sql.Open("sqlite", "file:"+path+"?mode=ro&_pragma=busy_timeout(5000)")
 	if err != nil {
 		return nil, err
@@ -82,7 +88,7 @@ func LoadData(path string) (*APIData, error) {
 	defer db.Close()
 
 	now := time.Now().Unix()
-	d := &APIData{Now: now}
+	d := &APIData{Now: now, WindowHours: windowHours}
 
 	// latest sample
 	var l Latest
@@ -97,8 +103,8 @@ func LoadData(path string) (*APIData, error) {
 		return nil, err
 	}
 
-	// 48h SoC series for the sparkline, downsampled
-	sr, err := db.Query(`SELECT ts,soc FROM samples WHERE ts>=? ORDER BY ts`, now-48*3600)
+	// SoC series for the sparkline (windowHours), downsampled
+	sr, err := db.Query(`SELECT ts,soc FROM samples WHERE ts>=? ORDER BY ts`, now-int64(windowHours)*3600)
 	if err != nil {
 		return nil, err
 	}

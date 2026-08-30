@@ -24,15 +24,34 @@ func main() {
 	noPaint := flag.Bool("nopaint", false, "render/preview only; don't touch the panel")
 	flashMode := flag.Bool("flash", false, "run a b/w flash test instead of the dashboard")
 	mono := flag.Bool("mono", false, "1-bit black/white instead of 4-grey")
+	keytest := flag.Bool("keytest", false, "monitor the 4 HAT buttons and print presses")
+	daemon := flag.Bool("daemon", false, "run continuously: paint periodically + on button presses")
 	flag.Parse()
+
+	if *keytest {
+		if _, err := host.Init(); err != nil {
+			log.Fatalf("host init: %v", err)
+		}
+		if err := KeyTest(); err != nil {
+			log.Fatalf("keytest: %v", err)
+		}
+		return
+	}
 
 	dbFile := *dbFlag
 	if dbFile == "" {
 		dbFile = defaultDBPath()
 	}
 
-	// Render the dashboard image first (needs no hardware) — read the DB directly.
-	data, ferr := LoadData(dbFile)
+	if *daemon {
+		if _, err := host.Init(); err != nil {
+			log.Fatalf("host init: %v", err)
+		}
+		log.Fatal(RunDaemon(dbFile))
+	}
+
+	// One-shot: render the dashboard image first (needs no hardware).
+	data, ferr := LoadData(dbFile, 48)
 	if ferr != nil {
 		log.Printf("db: %v (rendering offline frame)", ferr)
 	}

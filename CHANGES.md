@@ -12,6 +12,25 @@ Data timestamps are UTC; the dates below are local (Europe/Amsterdam).
 
 Working toward 1.0.
 
+### 2026-08-30 — the 4 HAT buttons; e-ink becomes a daemon
+
+**Added**
+- The **2.7″ HAT's 4 buttons** now do things (BCM 5/6/13/19, polled + debounced):
+  - **KEY1** force-refresh
+  - **KEY2** cycle the sparkline window: 24 h / 48 h / 7 d
+  - **KEY3** WiFi on/off — **radio only**, so Bluetooth/BLE polling never stops;
+    also pauses the `wifi-watchdog` while off, and shows a header indicator
+  - **KEY4** tap = a system-info screen (uptime, IP, CPU temp, disk, RTC);
+    hold 3 s = graceful power-off
+- The header timestamp already shows wall-clock time; the sparkline label now
+  reflects the selected window.
+
+**Changed**
+- **`batteryeink` is now a daemon** (`Type=simple`, `Restart=always`) instead of
+  a timer-triggered one-shot — it holds button state, repaints every 10 min, and
+  reacts to presses (rapid presses coalesce into one repaint). The
+  `batteryeink.timer` is retired.
+
 ### 2026-08-30 — e-ink goes standalone; web dashboard retired
 
 **Changed**
