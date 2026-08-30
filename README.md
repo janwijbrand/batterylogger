@@ -6,8 +6,14 @@ and keeps the history the vendor app throws away.*
 ![batterijtje on a Raspberry Pi Zero W with a Waveshare 2.7-inch e-Paper HAT and a DS3231 RTC](docs/dashboard-eink.jpg)
 
 > The live dashboard on its **2.7″ e-ink panel** (264×176), rendered by a small Go
-> binary from the same data as the web view and repainted every 10 minutes. The
-> DS3231 RTC (top-right) keeps the clock across power-cuts.
+> binary straight from the SQLite log and repainted every 10 minutes. The DS3231
+> RTC (top-right) keeps the clock across power-cuts.
+
+![The rendered 264×176 dashboard frame (4-grey)](docs/dashboard-render.png)
+
+> The actual frame the renderer draws — 264×176, 4-grey: a wall-clock timestamp,
+> the SoC hero + battery bar, Current / Voltage / Power / time-to-empty tiles, and
+> a 48 h state-of-charge sparkline. *(Home-float data; numbers cycle on a trip.)*
 
 An always-on logger + e-ink dashboard for the LiFePO4 battery in a campervan
 (**ECTIVE Accubox 120S** power station). It polls the battery's BLE BMS, stores
@@ -96,18 +102,22 @@ sudo raspi-config nonint do_spi 0            # SPI for the e-ink HAT
 sudo raspi-config nonint do_i2c 0            # I²C for the DS3231 RTC
 sudo apt install -y rfkill iw wireless-tools i2c-tools
 echo "dtoverlay=i2c-rtc,ds3231" | sudo tee -a /boot/firmware/config.txt   # RTC
+# Fit a CR1220 coin cell in the DS3231 so it keeps time while the Pi is off.
 
 # Python env (just the BLE logger)
 python3 -m venv ~/batterylogger/venv
 ~/batterylogger/venv/bin/pip install -r requirements.txt
 
-# WiFi power-save off (shared radio → BLE reliability); see docs
+# WiFi power-save off (the shared WiFi/BT radio starves BLE otherwise):
+printf '[connection]\nwifi.powersave = 2\n' | \
+  sudo tee /etc/NetworkManager/conf.d/wifi-powersave-off.conf >/dev/null
 
 # Build + copy the e-ink renderer (from a dev machine with Go):
 ( cd batterylogger/eink && ./build.sh )
 scp batterylogger/eink/batteryeink $USER@host:~/batterylogger/
 
 # Install services (substitute your Pi user for the __USER__ placeholder):
+sudo install -m 755 systemd/wifi-watchdog.sh /usr/local/sbin/   # watchdog daemon script
 for u in batterylogger wifi-watchdog batteryeink; do
   sed "s/__USER__/$USER/g" systemd/$u.service | sudo tee /etc/systemd/system/$u.service >/dev/null
 done
@@ -124,9 +134,9 @@ cd batterylogger && ./deploy.sh user@hostname.local   # or: export DEPLOY_TARGET
 ## Data notes
 
 - **Net measurement.** The Accubox exposes one current (charge − load) at the
-  terminal; gross solar vs gross load cannot be separated in software. Daily bars
-  are *net*. The overnight window (22:00–06:00, when nothing charges) is the clean
-  "will we make it to morning?" figure.
+  terminal; gross solar vs gross load cannot be separated in software, so the daily
+  Ah figures are *net*. The overnight window (22:00–06:00, when nothing charges) is
+  the clean "will we make it to morning?" figure.
 - **Timestamps are UTC epoch** in the DB; the renderer localises to
   `Europe/Amsterdam` for the overnight-window figure.
 - **DS3231 RTC** on I²C (`dtoverlay=i2c-rtc,ds3231`) keeps the clock correct
@@ -134,12 +144,17 @@ cd batterylogger && ./deploy.sh user@hostname.local   # or: export DEPLOY_TARGET
 
 ## Status / roadmap
 
-- [x] Logger + dashboard running, boot-persistent, survives WiFi drops & reboots
-- [x] Clock guard (fake-hwclock + synced flag)
+- [x] Logger + e-ink dashboard running, boot-persistent, survives WiFi drops & reboots
+- [x] Clock guard (started as `fake-hwclock` + a `synced` flag; now a real RTC)
 - [x] Net labelling, overnight-load metric, trapezoidal integration, gap accounting
 - [x] DS3231 RTC on I²C (`dtoverlay=i2c-rtc,ds3231`; retired `fake-hwclock`)
 - [x] E-ink render to a Waveshare 2.7″ HAT — `batteryeink` (Go), on a 10-min timer
 - [x] Grayscale (4-level) e-ink rendering for smoother text (`-mono` for 1-bit)
+- [x] E-ink reads SQLite directly; web dashboard retired (renderer is self-sufficient)
+- [ ] Re-verify the coin-cell backup after the RTC solder rework
+- [ ] 3D-printed housing
+- [ ] Utilise the 4 HAT buttons (KEY1–4)
+- [ ] Log a full multi-day off-grid trip → tag **1.0**
 - [ ] Move development to the spare Pi 3
 
 ## License
