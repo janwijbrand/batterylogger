@@ -3,11 +3,16 @@
 *A Raspberry Pi Zero that watches a campervan's LiFePO4 battery over Bluetooth
 and keeps the history the vendor app throws away.*
 
-![The batterijtje web dashboard](docs/dashboard.png)
+![batterijtje on a Raspberry Pi Zero W with a Waveshare 2.7-inch e-Paper HAT and a DS3231 RTC](docs/dashboard-eink.jpg)
 
-> The dashboard is a monochrome **800×480** layout — deliberately the prototype for
-> the planned e-ink display, so whatever you tune in the browser ports straight to the
-> HAT. *(Screenshot shows representative data.)*
+> The live dashboard on its **2.7″ e-ink panel** (264×176), rendered by a small Go
+> binary from the same data as the web view and repainted every 10 minutes. The
+> DS3231 RTC (top-right) keeps the clock across power-cuts.
+
+![The batterijtje browser dashboard](docs/dashboard.png)
+
+> The same design in the browser, where it's tuned — a monochrome layout that ports
+> straight to the panel. *(Screenshot shows representative data.)*
 
 An always-on logger + dashboard for the LiFePO4 battery in a campervan
 (**ECTIVE Accubox 120S** power station). It polls the battery's BLE BMS, stores
@@ -24,7 +29,8 @@ Notable changes are tracked in [`CHANGES.md`](CHANGES.md).
 - **Raspberry Pi Zero W v1.1** (ARMv6), Raspberry Pi OS Lite 32-bit, powered from
   the Accubox's own USB-A port — so the logger shows up in its own data as a ~1 W load.
 - Battery: ECTIVE LC-series LiFePO4 with a Topband BLE BMS.
-- Future: Waveshare 7.5" e-ink HAT (800×480) over SPI (SPI already enabled).
+- **Waveshare 2.7" e-Paper HAT** (264×176, V2) over SPI + a **DS3231 RTC** on I²C —
+  both installed, driven by the `batteryeink` Go renderer on a 10-minute timer.
 
 ## Architecture
 
