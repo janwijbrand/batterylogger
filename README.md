@@ -69,14 +69,22 @@ Not documented publicly for the Accubox; recovered by decompiling the ECTIVE
 ```
 batterylogger/
   logger.py            BLE → SQLite logger
-  webapp.py            Flask dashboard backend
+  webapp.py            Flask dashboard backend (fallback; superseded by webserver/)
+  webserver/           batteryweb-go — Go dashboard server (:8080), the live one
+  eink/                batteryeink — Go renderer for the 2.7" e-Paper HAT
   web/index.html       dashboard (self-contained, no CDN)
   requirements.txt     pip deps (installed into the Pi venv)
   deploy.sh            scp code to the Pi + restart services
-  systemd/             unit files + fake-hwclock 15-min save override
+  systemd/             unit files (logger, web, wifi-watchdog, eink timer, ...)
 van-battery-logger-brief.md   original brief
 handoff-0*.md          design suggestions (assessed; most applied)
 ```
+
+The two Go binaries are pure-Go and cross-compile to the Pi Zero's ARMv6 with
+no toolchain (`CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=6`); see each dir's
+`build.sh`. `batteryeink` fetches `/api/data` from the local server, draws a
+264×176 1-bit frame, and drives the panel over SPI (`periph.io`), repainting on
+a systemd timer.
 
 ## Setup (fresh Pi)
 
@@ -121,8 +129,9 @@ cd batterylogger && ./deploy.sh user@hostname.local   # or: export DEPLOY_TARGET
 - [x] Logger + dashboard running, boot-persistent, survives WiFi drops & reboots
 - [x] Clock guard (fake-hwclock + synced flag)
 - [x] Net labelling, overnight-load metric, trapezoidal integration, gap accounting
-- [ ] DS3231 RTC on I²C
-- [ ] E-ink render (Pillow → PNG → HAT), reusing the dashboard layout
+- [x] DS3231 RTC on I²C (`dtoverlay=i2c-rtc,ds3231`; retired `fake-hwclock`)
+- [x] E-ink render to a Waveshare 2.7″ HAT — `batteryeink` (Go), on a 10-min timer
+- [ ] Grayscale (4-level) e-ink rendering for smoother text
 - [ ] Move development to the spare Pi 3
 
 ## License

@@ -15,5 +15,9 @@ venv/
 # OS cruft
 .DS_Store
 
-# compiled Go dashboard binary (build with webserver/build.sh)
+# compiled Go binaries (build with the respective build.sh)
 batterylogger/webserver/batteryweb-go
+batterylogger/eink/batteryeink
+
+# debug PNGs from the e-ink renderer (the -png flag)
+batterylogger/eink/*.png
