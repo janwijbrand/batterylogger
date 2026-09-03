@@ -12,6 +12,37 @@ Data timestamps are UTC; the dates below are local (Europe/Amsterdam).
 
 Working toward 1.0.
 
+### 2026-09-03 — a bitmap font for the small text
+
+**Changed**
+- **The small faces are now a bitmap font** (`basicfont.Face7x13`) instead of
+  9 px / 11 px `goregular`. An outline font that small can't resolve its stems
+  on the pixel grid, and the only reason it looked acceptable was the 4-grey
+  antialiasing propping it up. A bitmap face is already a 1-bit stencil, so it
+  stays sharp when thresholded — which is what unblocks a mono render path, and
+  with it **partial (non-flashing) refresh**: 4-grey and partial are mutually
+  exclusive on this controller, since 4-grey uses RAM `0x26` as its second
+  bit-plane while partial needs it to hold the previous image. The large text
+  (SoC number, tile values, headings) stays outline — it thresholds cleanly.
+- **The wifi tag moved from the header to the sparkline label row.** At a fixed
+  7 px per character the header can't hold `batterijtje` + the tag + a
+  `2026/09/03 15:04 ?clk` timestamp (147 px). It sits at a fixed x so it doesn't
+  shift between "wifi on" and "wifi off" — a field that moves when it changes is
+  the enemy of a partial-update diff region.
+- **`blackThreshold` 176 → 128.** The 176 bias existed to keep antialiased 9 px
+  stems alive; with the small text now threshold-independent it only fattened
+  the 16 px tile values (the counters of "8" and the apex of "A" filled in).
+- The strings drawn in the small faces are ASCII now (`·` and `–` became `-`,
+  the KEY4 hint got shorter) — a bitmap face has no glyph outside 0x20-0x7e and
+  would otherwise paint U+FFFD boxes. The offline frame's error string is
+  truncated to the panel width instead of running off the edge.
+- The paint path is **unchanged**: the daemon still paints 4-grey. This change
+  only makes mono good enough to switch to.
+
+**Added**
+- `batteryeink -screen sysinfo|message` renders the KEY4 and power-off frames
+  off-hardware, so `-nopaint -png` can check all three screens.
+
 ### 2026-08-30 — the 4 HAT buttons; e-ink becomes a daemon
 
 **Added**

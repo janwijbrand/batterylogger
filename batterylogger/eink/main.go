@@ -26,6 +26,7 @@ func main() {
 	mono := flag.Bool("mono", false, "1-bit black/white instead of 4-grey")
 	keytest := flag.Bool("keytest", false, "monitor the 4 HAT buttons and print presses")
 	daemon := flag.Bool("daemon", false, "run continuously: paint periodically + on button presses")
+	screen := flag.String("screen", "dashboard", "which frame to render: dashboard | sysinfo | message")
 	flag.Parse()
 
 	if *keytest {
@@ -50,12 +51,23 @@ func main() {
 		log.Fatal(RunDaemon(dbFile))
 	}
 
-	// One-shot: render the dashboard image first (needs no hardware).
-	data, ferr := LoadData(dbFile, 48)
-	if ferr != nil {
-		log.Printf("db: %v (rendering offline frame)", ferr)
+	// One-shot: render the frame first (needs no hardware).
+	var img *image.Gray
+	switch *screen {
+	case "sysinfo": // the KEY4 screen, with stand-in values so it can be checked off-box
+		img = RenderSysInfo([]string{
+			"up   12d 4h 37m", "ip   192.168.178.42", "cpu  46 C",
+			"disk 21.4 / 30 GB free", "rtc  ok (ds3231)",
+		})
+	case "message":
+		img = RenderMessage("bye", "safe to unplug when the LED is dark")
+	default:
+		data, ferr := LoadData(dbFile, 48)
+		if ferr != nil {
+			log.Printf("db: %v (rendering offline frame)", ferr)
+		}
+		img = RenderDashboard(data, ferr)
 	}
-	img := RenderDashboard(data, ferr)
 
 	if *pngPath != "" {
 		var preview *image.Gray

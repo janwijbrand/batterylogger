@@ -177,7 +177,7 @@ func sysInfo(wifiOff bool) []string {
 	}
 	ip := "wifi off"
 	if !wifiOff {
-		ip = "—"
+		ip = "-"
 		if addrs, err := net.InterfaceAddrs(); err == nil {
 			for _, a := range addrs {
 				if n, ok := a.(*net.IPNet); ok && !n.IP.IsLoopback() && n.IP.To4() != nil {
