@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"golang.org/x/image/font"
+	"golang.org/x/image/font/basicfont"
 	"golang.org/x/image/font/gofont/gobold"
-	"golang.org/x/image/font/gofont/goregular"
 	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/math/fixed"
 )
@@ -24,13 +24,30 @@ const (
 	H = 176
 )
 
+// The big text is an outline face: at 15-40 px the stems are thick relative to
+// the glyph, so it thresholds to 1-bit cleanly. The small text is a *bitmap*
+// face, drawn on the pixel grid — an outline font at 9-11 px only looked right
+// because 4-grey antialiasing rescued it, and that rescue is what blocks mono
+// (and therefore partial refresh). basicfont.Face7x13 is monospace, which also
+// stops the header timestamp reflowing as its digits change.
+//
+// Bitmap faces cover ASCII 0x20-0x7e only: keep every fTiny/fSmall string ASCII
+// or it renders as U+FFFD boxes.
 var (
 	fTitle = mustFace(gobold.TTF, 15)
 	fBig   = mustFace(gobold.TTF, 40)
 	fPct   = mustFace(gobold.TTF, 18)
-	fSmall = mustFace(goregular.TTF, 11)
-	fTiny  = mustFace(goregular.TTF, 9)
+	fSmall = basicfont.Face7x13
+	fTiny  = basicfont.Face7x13
 	fTileV = mustFace(gobold.TTF, 16)
+)
+
+// cellW is the advance of the bitmap faces, in pixels — handy for laying out
+// fixed-width strings without measuring. wifiTagX is where the wifi tag starts
+// on the sparkline label row, between the window label and the night figure.
+const (
+	cellW    = 7
+	wifiTagX = 104
 )
 
 func mustFace(ttf []byte, px float64) font.Face {
@@ -178,6 +195,16 @@ func durShort(h, m int) string {
 	}
 }
 
+// clip truncates s to at most n bitmap-font cells, marking the cut with "..".
+// Counts runes, not bytes, so a stray non-ASCII byte can't be cut in half.
+func clip(s string, n int) string {
+	r := []rune(s)
+	if len(r) <= n || n < 3 {
+		return s
+	}
+	return string(r[:n-2]) + ".."
+}
+
 // --- the dashboard ---
 
 func RenderDashboard(d *APIData, ferr error) *image.Gray {
@@ -196,7 +223,7 @@ func RenderDashboard(d *APIData, ferr error) *image.Gray {
 		textRight(img, fTiny, W-5, 6, "offline")
 		hline(img, 3, W-4, 22)
 		textTop(img, fBig, 20, 60, "—")
-		textTop(img, fSmall, 20, 110, msg)
+		textTop(img, fSmall, 20, 110, clip(msg, (W-40)/cellW))
 		return img
 	}
 
@@ -209,12 +236,10 @@ func RenderDashboard(d *APIData, ferr error) *image.Gray {
 	if L.Synced == 0 {
 		stamp += " ?clk"
 	}
+	// At 7 px/char the stamp is 112 px, or 147 px with the " ?clk" suffix — that
+	// plus the title leaves no room for the wifi tag, so the tag moved down to
+	// the sparkline label row.
 	textRight(img, fTiny, W-5, 6, stamp)
-	wifiTag := "· wifi on"
-	if d.WifiOff {
-		wifiTag = "· wifi off"
-	}
-	textTop(img, fTiny, 5+textW(fTitle, "batterijtje")+8, 8, wifiTag)
 	hline(img, 3, W-4, 22)
 
 	// ---- left column: SoC hero ----
@@ -286,13 +311,22 @@ func RenderDashboard(d *APIData, ferr error) *image.Gray {
 
 	// ---- sparkline: 48h SoC ----
 	textTop(img, fTiny, 6, 107, windowLabel(d.WindowHours))
-	night := "night –"
+	// Fixed left edge, not centred: "wifi on" and "wifi off" differ by a cell, and
+	// a field that shifts when it changes is exactly what partial refresh hates.
+	wifiTag := "wifi on"
+	if d.WifiOff {
+		wifiTag = "wifi off"
+	}
+	textTop(img, fTiny, wifiTagX, 107, wifiTag)
+	night := "night -"
 	if d.LastNight != nil {
 		night = fmt.Sprintf("night %d Ah", d.LastNight.OutAh)
 	}
 	textRight(img, fTiny, W-6, 107, night)
 
-	px0, py0, px1, py1 := 6, 120, W-6, 172 // plot box (top=100%, bottom=0%)
+	// py0 clears the label row above it: the bitmap face descends 2 px below its
+	// baseline, so a "night ..." g would otherwise sit on the top gridline.
+	px0, py0, px1, py1 := 6, 122, W-6, 172 // plot box (top=100%, bottom=0%)
 	// gridlines 0/50/100
 	dottedHLine(img, px0, px1, py0)
 	dottedHLine(img, px0, px1, (py0+py1)/2)
@@ -354,7 +388,7 @@ func RenderSysInfo(lines []string) *image.Gray {
 		y += 21
 	}
 	hline(img, 3, W-4, H-21)
-	textTop(img, fTiny, 6, H-17, "hold KEY4 3s = power off  ·  tap KEY4 = back")
+	textTop(img, fTiny, 6, H-17, "hold KEY4 3s = off / tap = back")
 	return img
 }
 
@@ -391,8 +425,11 @@ func absI(v int) int {
 }
 
 // blackThreshold: a rendered pixel darker than this becomes a black panel pixel.
-// Set high so anti-aliased text strokes stay solid instead of breaking up.
-const blackThreshold = 176
+// Only the outline faces produce in-between greys now (the bitmap faces emit 0
+// or 255), so this is back to a plain midpoint: the old 176 was biased toward
+// black to keep antialiased 9 px stems alive, and at that value the 16 px tile
+// values clogged — the counters of "8" and the apex of "A" filled in.
+const blackThreshold = 128
 
 // GetBufferFromImage packs the rendered Gray image into the panel's 1-bit buffer.
 func GetBufferFromImage(img *image.Gray) []byte {
