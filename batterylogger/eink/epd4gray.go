@@ -91,7 +91,9 @@ func (e *EPD) turnOn4Gray() {
 }
 
 // Display4Gray writes the two RAM planes and runs the 4-grey refresh.
+// Self-contained, like the other Display* calls: it runs Init4Gray itself.
 func (e *EPD) Display4Gray(plane1, plane2 []byte) {
+	e.Init4Gray()
 	e.cmd(0x24)
 	e.data(plane1...)
 	e.cmd(0x26)

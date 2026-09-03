@@ -27,7 +27,18 @@ func main() {
 	keytest := flag.Bool("keytest", false, "monitor the 4 HAT buttons and print presses")
 	daemon := flag.Bool("daemon", false, "run continuously: paint periodically + on button presses")
 	screen := flag.String("screen", "dashboard", "which frame to render: dashboard | sysinfo | message")
+	fourGray := flag.Bool("4gray", false, "daemon: use the old 4-grey full-refresh path")
+	fastBase := flag.Bool("fastbase", false, "use the fast (0xC7) waveform for base refreshes")
+	partialTest := flag.Bool("partialtest", false, "paint a scripted sequence through the real paint policy")
+	interval := flag.Duration("interval", 15*time.Second, "-partialtest: pause between frames")
+	dumpCmds := flag.Bool("dumpcmds", false, "print the command stream a paint would emit; no hardware")
 	flag.Parse()
+	mode := PaintMode{FourGray: *fourGray, FastBase: *fastBase}
+
+	if *dumpCmds {
+		DumpCommands(os.Stdout)
+		return
+	}
 
 	if *keytest {
 		if _, err := host.Init(); err != nil {
@@ -48,7 +59,20 @@ func main() {
 		if _, err := host.Init(); err != nil {
 			log.Fatalf("host init: %v", err)
 		}
-		log.Fatal(RunDaemon(dbFile))
+		log.Fatal(RunDaemon(dbFile, mode))
+	}
+
+	if *partialTest {
+		if _, err := host.Init(); err != nil {
+			log.Fatalf("host init: %v", err)
+		}
+		e, err := NewEPD()
+		if err != nil {
+			log.Fatalf("epd: %v", err)
+		}
+		defer e.Close()
+		PartialTest(e, *interval, mode)
+		return
 	}
 
 	// One-shot: render the frame first (needs no hardware).
@@ -104,15 +128,12 @@ func main() {
 	t := time.Now()
 	switch {
 	case *flashMode:
-		e.Init()
 		flashTest(e)
 	case *mono:
-		e.Init()
 		e.Display(GetBufferFromImage(img))
 		e.Sleep()
 		log.Printf("dashboard painted (mono, %.2fs)", time.Since(t).Seconds())
 	default:
-		e.Init4Gray()
 		p1, p2 := GetBuffers4Gray(img)
 		e.Display4Gray(p1, p2)
 		e.Sleep()
@@ -123,10 +144,7 @@ func main() {
 func flashTest(e *EPD) {
 	e.Clear()
 	black := make([]byte, bufLen)
-	white := make([]byte, bufLen)
-	for i := range white {
-		white[i] = 0xFF
-	}
+	white := whiteBuf()
 	for i := 0; i < 3; i++ {
 		e.Display(black)
 		e.Display(white)

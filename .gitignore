@@ -15,8 +15,9 @@ venv/
 # OS cruft
 .DS_Store
 
-# compiled Go binary (build with eink/build.sh)
+# compiled Go binaries (build with eink/build.sh)
 batterylogger/eink/batteryeink
+batterylogger/eink/eink
 
 # debug PNGs from the e-ink renderer (the -png flag)
 batterylogger/eink/*.png

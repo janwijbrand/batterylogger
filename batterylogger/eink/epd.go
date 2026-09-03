@@ -35,6 +35,21 @@ type EPD struct {
 	dc   gpio.PinIO
 	busy gpio.PinIO
 	pwr  gpio.PinIO
+
+	// trace, when non-nil, captures the command stream *instead* of touching
+	// any hardware — so the exact byte sequence of a paint can be checked off
+	// the Pi (see -dumpcmds). Ordering is the whole game in the partial path.
+	trace func(op string, b []byte)
+
+	// sleptAt is when deep sleep was last entered, so the settle delay can be
+	// paid lazily — see Sleep.
+	sleptAt time.Time
+}
+
+// newTraceEPD returns an EPD that drives nothing and records what it would have
+// sent. It has no SPI port or GPIO pins, so never call Close on it.
+func newTraceEPD(trace func(op string, b []byte)) *EPD {
+	return &EPD{trace: trace}
 }
 
 // NewEPD opens SPI0.0 and the control pins. host.Init() must have run first.
@@ -71,12 +86,20 @@ func NewEPD() (*EPD, error) {
 }
 
 func (e *EPD) cmd(b byte) {
+	if e.trace != nil {
+		e.trace("cmd", []byte{b})
+		return
+	}
 	e.dc.Out(gpio.Low)
 	e.conn.Tx([]byte{b}, nil)
 }
 
 func (e *EPD) data(b ...byte) {
 	if len(b) == 0 {
+		return
+	}
+	if e.trace != nil {
+		e.trace("data", b)
 		return
 	}
 	e.dc.Out(gpio.High)
@@ -91,12 +114,21 @@ func (e *EPD) data(b ...byte) {
 }
 
 func (e *EPD) readBusy() {
+	if e.trace != nil {
+		e.trace("busy", nil)
+		return
+	}
 	for e.busy.Read() == gpio.High { // high = busy
 		time.Sleep(20 * time.Millisecond)
 	}
 }
 
 func (e *EPD) reset() {
+	if e.trace != nil {
+		e.trace("reset", nil)
+		return
+	}
+	e.settle()
 	e.rst.Out(gpio.High)
 	time.Sleep(200 * time.Millisecond)
 	e.rst.Out(gpio.Low)
@@ -126,8 +158,15 @@ func (e *EPD) turnOn() {
 	e.readBusy()
 }
 
-// Display writes a full 5808-byte 1-bit frame and refreshes.
+// Display writes a full 5808-byte 1-bit frame and refreshes (flashing).
+//
+// Every Display* entry point is self-contained: it runs its own init, so the
+// caller only ever does Display*(...) then Sleep(). That matters most in the
+// partial path — a partial that skipped its reset would paint through whatever
+// state the previous call left behind — so the mono and 4-grey paths follow the
+// same rule rather than being the odd ones out.
 func (e *EPD) Display(buf []byte) {
+	e.Init()
 	e.cmd(0x24)
 	e.data(buf...)
 	e.turnOn()
@@ -135,22 +174,50 @@ func (e *EPD) Display(buf []byte) {
 
 // Clear paints the panel all-white.
 func (e *EPD) Clear() {
+	e.Display(whiteBuf())
+}
+
+// whiteBuf is an all-white (all bits set) frame buffer.
+func whiteBuf() []byte {
 	b := make([]byte, bufLen)
 	for i := range b {
 		b[i] = 0xFF
 	}
-	e.Display(b)
+	return b
 }
 
 // Sleep puts the controller into deep sleep (image is retained on the glass).
 func (e *EPD) Sleep() {
 	e.cmd(0x10)
 	e.data(0x01)
-	time.Sleep(2 * time.Second)
+	e.sleptAt = time.Now()
 }
 
-// Close drops the control lines and releases SPI.
+// sleepSettle is Waveshare's 2 s delay after entering deep sleep. They spend it
+// immediately; we only record when sleep started and pay whatever is left of it
+// at the next reset (below). The panel still gets its quiet 2 s — but an idle
+// daemon spends them idling, and a button press 10 minutes later waits for
+// nothing. With a partial refresh at well under a second, that fixed 2 s was
+// most of the wall-clock cost of a paint.
+const sleepSettle = 2 * time.Second
+
+// settle waits out whatever remains of the post-sleep quiet period.
+func (e *EPD) settle() {
+	if e.sleptAt.IsZero() {
+		return
+	}
+	if d := sleepSettle - time.Since(e.sleptAt); d > 0 {
+		time.Sleep(d)
+	}
+	e.sleptAt = time.Time{}
+}
+
+// Close drops the control lines and releases SPI. It pays any outstanding
+// settle delay first: everywhere else the delay can be deferred because the next
+// thing to touch the panel is a reset, but here the next thing is the power pin
+// going low, and cutting power mid-transition is what the delay guards against.
 func (e *EPD) Close() {
+	e.settle()
 	e.rst.Out(gpio.Low)
 	e.dc.Out(gpio.Low)
 	e.pwr.Out(gpio.Low)
