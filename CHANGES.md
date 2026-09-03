@@ -12,6 +12,58 @@ Data timestamps are UTC; the dates below are local (Europe/Amsterdam).
 
 Working toward 1.0.
 
+### 2026-09-03 — partial (non-flashing) refresh
+
+**Changed**
+- **The daemon paints mono with partial refresh.** A periodic repaint no longer
+  flashes: the controller's DU waveform only moves pixels where the new frame
+  differs from the one on the glass. Measured on the panel: **0.99 s for a
+  partial vs 1.88 s for a full mono refresh vs 6.01 s for the old 4-grey path.**
+  Button presses are the real win — KEY2 cycling the window now answers in about
+  a second instead of six.
+- **`Sleep()` no longer blocks for 2 s.** Waveshare spends the post-deep-sleep
+  settle delay immediately; we record when sleep started and pay whatever is left
+  of it at the next reset. The panel still gets its quiet 2 s, but an idle daemon
+  spends them idling and a button press 10 minutes later waits for none of them.
+  That delay was most of the wall-clock cost of a paint (2.98 s -> 0.99 s).
+- **Every `Display*` call is now self-contained** — it runs its own init, so the
+  caller only does `Display*(...)` then `Sleep()`. Previously `Display` needed a
+  separate `Init()` while the new partial calls did their own; one rule is harder
+  to get wrong, and a partial that skipped its reset would paint through whatever
+  state the last call left behind.
+- **KEY1 now forces a base (flashing) refresh.** With partial updates a repaint
+  can legitimately be skipped when nothing changed, which would leave "force
+  refresh" looking dead. It doubles as the on-demand way to clear ghosting.
+
+**Added**
+- `epdpartial.go`: `DisplayBase` (paints and seeds *both* RAM planes),
+  `DisplayPartial` (restores the previous frame to `0x26` from host memory before
+  writing `0x24`), `setFullWindow`, and the fast-waveform variants. Waveshare's
+  `display_Partial()` writes only `0x24` and trusts the panel's `0x26`; we sleep
+  after every paint and deep sleep stops refreshing that RAM, so the previous
+  frame is always re-sent from our own copy.
+- The paint policy (`paint.go`) spends a full refresh on: the first paint, any
+  change of screen kind (dashboard / sysinfo / message — a partial across two
+  different layouts is where DU looks worst), every 6 partials, once a day, and
+  on KEY1. An unchanged frame is skipped entirely.
+- `-partialtest` drives a scripted sequence (clock tick, big diff, screen change,
+  a run past the base counter) through the real policy with `-interval`, and
+  `-dumpcmds` prints the exact command stream a paint would emit without any
+  hardware — ordering is what makes or breaks the partial path and it can't be
+  seen from a photo.
+- `-4gray` keeps the old path reachable for comparison on the same panel.
+
+**Not adopted**
+- `init_Fast` + `0xC7` for base refreshes (`-fastbase`, default off): measured
+  **slower** at 2.30 s, because that init spends two SWRESETs and two extra
+  activate-and-wait cycles before painting. Kept only so the finding can be
+  re-checked.
+- Host-side cold gating of partial refresh. The controller compensates for
+  temperature itself; a host policy on top has nothing to do until sub-zero
+  touring is on the table. Noted in `handoff-05-partial-refresh.md`, including
+  the trap that `/sys/class/hwmon/hwmon*` is not stably ordered — the DS3231 is
+  reachable at `/sys/class/rtc/rtc0/device/hwmon/hwmon*/temp1_input`.
+
 ### 2026-09-03 — a bitmap font for the small text
 
 **Changed**

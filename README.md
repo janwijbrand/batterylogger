@@ -11,7 +11,7 @@ and keeps the history the vendor app throws away.*
 
 ![The rendered 264×176 dashboard frame (4-grey)](docs/dashboard-render.png)
 
-> The actual frame the renderer draws — 264×176: a wall-clock timestamp, the SoC
+> The frame the renderer draws — 264×176: a wall-clock timestamp, the SoC
 > hero + battery bar, Current / Voltage / Power / time-to-empty tiles, and a 48 h
 > state-of-charge sparkline. The small text is a **bitmap font** drawn on the pixel
 > grid, so it stays sharp with no antialiasing to lean on; only the big numbers are
@@ -97,8 +97,10 @@ handoff-0*.md          design suggestions (assessed; most applied)
 `batteryeink` is pure Go and cross-compiles to the Pi Zero's ARMv6 with no
 toolchain (`CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=6`; see `eink/build.sh`).
 It reads the SQLite DB read-only (pure-Go `modernc.org/sqlite`), draws a 264×176
-4-grey frame, and drives the panel over SPI (`periph.io`), repainting every 10 min
-and on a button press. `./batteryeink -nopaint -png out.png` dumps the current
+1-bit frame, and drives the panel over SPI (`periph.io`), repainting every 10 min
+and on a button press. Repaints are **partial** (differential, non-flashing,
+~1 s); a full flashing refresh is spent on screen changes, every 6 partials, once
+a day, and on KEY1. `./batteryeink -nopaint -png out.png` dumps the current
 frame for a remote look — add `-mono` for the 1-bit version, `-scale N` to
 upscale, and `-screen sysinfo|message` for the other two frames. (An earlier
 Flask/Go **web** dashboard was retired once the e-ink renderer became
@@ -162,13 +164,13 @@ cd batterylogger && ./deploy.sh user@hostname.local   # or: export DEPLOY_TARGET
 - [x] Net labelling, overnight-load metric, trapezoidal integration, gap accounting
 - [x] DS3231 RTC on I²C (`dtoverlay=i2c-rtc,ds3231`; retired `fake-hwclock`)
 - [x] E-ink render to a Waveshare 2.7″ HAT — `batteryeink` (Go), repainting every 10 min
-- [x] Grayscale (4-level) e-ink rendering for smoother text (`-mono` for 1-bit)
+- [x] Grayscale (4-level) e-ink rendering for smoother text (superseded by the
+      bitmap font + mono; still reachable with `-4gray`)
 - [x] Bitmap font for the small text — 1-bit renders sharp without antialiasing
+- [x] Partial (non-flashing) refresh — 0.99 s vs 6.01 s for the old 4-grey paint
 - [x] E-ink reads SQLite directly; web dashboard retired (renderer is self-sufficient)
 - [ ] Re-verify the coin-cell backup after the RTC solder rework
 - [x] Utilise the 4 HAT buttons (refresh · window · WiFi · info/power-off)
-- [ ] Partial (non-flashing) refresh — needs the mono path (4-grey and partial
-      can't coexist: both want RAM `0x26`)
 - [ ] 3D-printed housing
 - [ ] Log a full multi-day off-grid trip → tag **1.0**
 - [ ] Move development to the spare Pi 3

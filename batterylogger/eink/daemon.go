@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: MIT
 
 // Daemon mode: paint the panel periodically and on button presses.
-//   KEY1 force refresh · KEY2 cycle 24h/48h/7d · KEY3 WiFi on/off
-//   KEY4 tap = system info, hold 3s = power off
+//
+//	KEY1 force refresh · KEY2 cycle 24h/48h/7d · KEY3 WiFi on/off
+//	KEY4 tap = system info, hold 3s = power off
 package main
 
 import (
 	"fmt"
-	"image"
 	"log"
 	"net"
 	"os"
@@ -28,7 +28,7 @@ const (
 )
 
 // RunDaemon owns the panel + buttons until the process exits.
-func RunDaemon(dbFile string) error {
+func RunDaemon(dbFile string, mode PaintMode) error {
 	epd, err := NewEPD()
 	if err != nil {
 		return fmt.Errorf("epd: %w", err)
@@ -53,16 +53,11 @@ func RunDaemon(dbFile string) error {
 		}
 	}()
 
-	show := func(img *image.Gray) {
-		epd.Init4Gray()
-		p1, p2 := GetBuffers4Gray(img)
-		epd.Display4Gray(p1, p2)
-		epd.Sleep()
-	}
+	pnt := &painter{epd: epd, mode: mode}
 
 	paint := func() {
 		if infoView {
-			show(RenderSysInfo(sysInfo(wifiOff)))
+			pnt.show(RenderSysInfo(sysInfo(wifiOff)), kindSysInfo)
 			return
 		}
 		d, ferr := LoadData(dbFile, windows[winIdx])
@@ -72,7 +67,7 @@ func RunDaemon(dbFile string) error {
 		if d != nil {
 			d.WifiOff = wifiOff
 		}
-		show(RenderDashboard(d, ferr))
+		pnt.show(RenderDashboard(d, ferr), kindDashboard)
 	}
 
 	// apply mutates state / does actions; returns true if a repaint is wanted.
@@ -80,14 +75,17 @@ func RunDaemon(dbFile string) error {
 		switch {
 		case ev.Name == "KEY4" && ev.Long:
 			log.Println("KEY4 held: powering off")
-			show(RenderMessage("bye", "safe to unplug when the LED is dark"))
+			// A kind change, so this is a full refresh — right for a frame that
+			// then sits on unpowered glass for however long the van is parked.
+			pnt.show(RenderMessage("bye", "safe to unplug when the LED is dark"), kindMessage)
 			exec.Command("sudo", "poweroff").Run()
 			select {} // wait for shutdown
 		case ev.Long:
 			return false // long-press only means something on KEY4
 		case ev.Name == "KEY1":
 			infoView = false
-			return true // force refresh
+			pnt.forceBase() // a real flash, not a maybe-nothing partial
+			return true
 		case ev.Name == "KEY2":
 			infoView = false
 			winIdx = (winIdx + 1) % len(windows)
@@ -103,7 +101,7 @@ func RunDaemon(dbFile string) error {
 		return false
 	}
 
-	log.Printf("daemon up: window=%dh wifiOff=%v", windows[winIdx], wifiOff)
+	log.Printf("daemon up: window=%dh wifiOff=%v mode=%+v", windows[winIdx], wifiOff, mode)
 	paint()
 	ticker := time.NewTicker(periodic)
 	defer ticker.Stop()

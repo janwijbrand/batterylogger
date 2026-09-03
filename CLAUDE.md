@@ -13,6 +13,13 @@ the display now; `batteryeink -nopaint -png` gives a remote look.) Dev happens
 off-box; deploy the logger with `scp`, the Go binary via `eink/build.sh` + `scp`.
 
 ## Render notes
+- **The panel is painted mono with partial refresh** (`paint.go` owns the policy;
+  `epdpartial.go` the primitives). `DisplayPartial` re-sends the previous frame to
+  RAM `0x26` from host memory on every call — do not "optimise" that away: we deep
+  sleep after each paint, and deep sleep stops refreshing that RAM. A full flashing
+  refresh is spent on screen changes, every 6 partials, daily, and on KEY1.
+  `-dumpcmds` prints the command stream without hardware; `-partialtest` drives the
+  real policy on the panel; `-4gray` falls back to the old path.
 - **The small text is a bitmap font** (`basicfont.Face7x13`), the big text an outline
   face. That's deliberate: outline glyphs at 9-11 px only looked right thanks to
   4-grey antialiasing, and needing that antialiasing is what blocks partial refresh
