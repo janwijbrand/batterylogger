@@ -3,19 +3,23 @@
 *A Raspberry Pi Zero that watches a campervan's LiFePO4 battery over Bluetooth
 and keeps the history the vendor app throws away.*
 
-![batterijtje on a Raspberry Pi Zero W with a Waveshare 2.7-inch e-Paper HAT and a DS3231 RTC](docs/dashboard-eink.jpg)
+![The dashboard on a Waveshare 2.7-inch e-Paper HAT, with the four KEY buttons down the left edge and a DS3231 RTC on flying leads to the right](docs/dashboard-eink.jpg)
 
-> The live dashboard on its **2.7″ e-ink panel** (264×176), rendered by a small Go
-> binary straight from the SQLite log and repainted every 10 minutes. The DS3231
-> RTC (top-right) keeps the clock across power-cuts.
+> The dashboard on its **2.7″ e-ink panel** (264×176), painted by a small Go binary
+> straight from the SQLite log. The Pi Zero W is underneath the HAT; the DS3231 RTC
+> is the small board on the flying leads at the right, and keeps the clock across
+> power-cuts. The four buttons down the left edge are KEY1–KEY4.
+> *(The readings are representative data generated for the photo, not a live
+> measurement — what's being shown is the layout.)*
 
-![The rendered 264×176 dashboard frame (4-grey)](docs/dashboard-render.png)
+![The rendered 264×176 dashboard frame](docs/dashboard-render.png)
 
-> The frame the renderer draws — 264×176: a wall-clock timestamp, the SoC
-> hero + battery bar, Current / Voltage / Power / time-to-empty tiles, and a 48 h
-> state-of-charge sparkline. The small text is a **bitmap font** drawn on the pixel
-> grid, so it stays sharp with no antialiasing to lean on; only the big numbers are
-> an outline face. *(Home-float data; numbers cycle on a trip.)*
+> The same frame as the renderer draws it, pixel for pixel — a wall-clock
+> timestamp, the wifi indicator, the SoC hero + battery bar, Current / Voltage /
+> Power / time-to-empty tiles, and a 48 h state-of-charge sparkline. The small text
+> is a **bitmap font** drawn on the pixel grid, so it stays sharp with no
+> antialiasing to lean on; only the big numbers are an outline face.
+> *(Same representative data as above.)*
 
 An always-on logger + e-ink dashboard for the LiFePO4 battery in a campervan
 (**ECTIVE Accubox 120S** power station). It polls the battery's BLE BMS, stores
@@ -50,10 +54,17 @@ the HAT's 4 buttons. The renderer opens the DB read-only, so it never blocks the
 logger (WAL allows one writer + concurrent readers). A `wifi-watchdog` daemon
 keeps the Pi reachable for remote access.
 
-**Buttons:** **KEY1** force-refresh · **KEY2** cycle the sparkline window
-(24 h / 48 h / 7 d) · **KEY3** WiFi on/off (radio only — Bluetooth/BLE keep
-running; pauses the watchdog while off) · **KEY4** tap = system-info screen,
+**Buttons:** **KEY1** force-refresh (a deliberate flash, which also clears any
+ghosting) · **KEY2** cycle the sparkline window (24 h / 48 h / 7 d) · **KEY3**
+WiFi on/off (radio only — Bluetooth/BLE keep running; pauses the watchdog while
+off, and the header's wifi icon disappears) · **KEY4** tap = system-info screen,
 hold 3 s = graceful power-off.
+
+![The KEY4 system-info screen: uptime, IP, CPU temperature, disk free and RTC status](docs/sysinfo-render.png)
+
+> The KEY4 screen — uptime, IP, CPU temperature, disk and RTC status; tap again to
+> go back. Every change of screen costs a full flashing refresh; ordinary updates
+> don't. *(Stand-in values.)*
 
 ## The BLE protocol (reverse-engineered)
 
@@ -90,6 +101,7 @@ batterylogger/
   requirements.txt     pip deps for the logger (installed into the Pi venv)
   deploy.sh            scp the logger to the Pi + restart it
   systemd/             unit files (logger, wifi-watchdog, eink daemon, ...)
+docs/demo-data.py      builds the fake battery.db behind the README shots
 van-battery-logger-brief.md   original brief
 handoff-0*.md          design suggestions (assessed; most applied)
 ```
@@ -102,7 +114,8 @@ and on a button press. Repaints are **partial** (differential, non-flashing,
 ~1 s); a full flashing refresh is spent on screen changes, every 6 partials, once
 a day, and on KEY1. `./batteryeink -nopaint -png out.png` dumps the current
 frame for a remote look — add `-mono` for the 1-bit version, `-scale N` to
-upscale, and `-screen sysinfo|message` for the other two frames. (An earlier
+upscale, `-screen sysinfo|message` for the other two frames, and `-wifioff` to
+preview the header without the wifi icon. (An earlier
 Flask/Go **web** dashboard was retired once the e-ink renderer became
 self-sufficient; it lives in git history.)
 
