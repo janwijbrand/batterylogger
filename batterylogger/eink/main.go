@@ -27,6 +27,7 @@ func main() {
 	keytest := flag.Bool("keytest", false, "monitor the 4 HAT buttons and print presses")
 	daemon := flag.Bool("daemon", false, "run continuously: paint periodically + on button presses")
 	screen := flag.String("screen", "dashboard", "which frame to render: dashboard | sysinfo | message")
+	wifiOff := flag.Bool("wifioff", false, "preview the dashboard as it looks with WiFi off")
 	fourGray := flag.Bool("4gray", false, "daemon: use the old 4-grey full-refresh path")
 	fastBase := flag.Bool("fastbase", false, "use the fast (0xC7) waveform for base refreshes")
 	partialTest := flag.Bool("partialtest", false, "paint a scripted sequence through the real paint policy")
@@ -89,6 +90,9 @@ func main() {
 		data, ferr := LoadData(dbFile, 48)
 		if ferr != nil {
 			log.Printf("db: %v (rendering offline frame)", ferr)
+		}
+		if data != nil {
+			data.WifiOff = *wifiOff
 		}
 		img = RenderDashboard(data, ferr)
 	}

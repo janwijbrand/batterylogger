@@ -12,6 +12,21 @@ Data timestamps are UTC; the dates below are local (Europe/Amsterdam).
 
 Working toward 1.0.
 
+### 2026-09-04 — new README shots
+
+**Changed**
+- **The README images are refreshed** for the bitmap font, the wifi icon and the
+  partial-refresh work: a new photo of the panel, a matching pixel-for-pixel
+  render of the same frame, and the KEY4 system screen alongside the buttons
+  section.
+- The frames show **representative data generated for the shot**, and the captions
+  say so. The previous captions described real home-float readings; these numbers
+  are invented, and a README shouldn't imply otherwise.
+
+**Added**
+- `batteryeink -wifioff` previews the dashboard as it looks with the wifi icon
+  absent, which is otherwise only reachable by toggling WiFi on the real thing.
+
 ### 2026-09-04 — a wifi icon, back in the header
 
 **Changed**
