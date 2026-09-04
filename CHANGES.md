@@ -12,6 +12,33 @@ Data timestamps are UTC; the dates below are local (Europe/Amsterdam).
 
 Working toward 1.0.
 
+### 2026-09-04 — a wifi icon, back in the header
+
+**Changed**
+- **The wifi indicator is an icon again, next to the title.** The bitmap font
+  pushed it down to the sparkline label row, because at a fixed 7 px per
+  character the words "wifi off" don't fit beside a 147 px `?clk` timestamp — but
+  a 21x11 icon does, with room to spare even in that worst case. The sparkline
+  label row goes back to just the window label and the night figure.
+- Icons are hand-placed 1-bit art (`wifiOnArt` / `wifiOffArt` in `render.go`),
+  not rasterised geometry: at this size every pixel is a design decision and a
+  generated arc is mush. `drawArt` treats `#` as black and `_` as forced white,
+  which is how the "off" slash cuts a clean gutter through the arc it crosses.
+
+The off state took several attempts and the reasons are worth keeping, since the
+constraint applies to any future icon:
+
+- A hairline arc cannot survive a strike-through. The slash needs a white gutter
+  either side to read as crossing rather than merging, and a 1 px arc minus a
+  gutter is gone. The arcs are 2 px.
+- Slash direction matters: bottom-left-to-top-right runs *tangent* to the arcs
+  and disappears into them. Top-left-to-bottom-right crosses them.
+- A 45° slash one pixel wide is a staircase of corner-touching pixels, which
+  reads as a dotted line. It is 2 px.
+- With both arcs present the slash still shreds the inner one into three
+  disconnected dots, so the off icon drops the inner arc and keeps the outer arc,
+  the dot and the slash. Losing an arc reads as "less signal" anyway.
+
 ### 2026-09-04 — `?clk` stops crying wolf
 
 **Fixed**

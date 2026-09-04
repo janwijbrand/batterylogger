@@ -43,12 +43,8 @@ var (
 )
 
 // cellW is the advance of the bitmap faces, in pixels — handy for laying out
-// fixed-width strings without measuring. wifiTagX is where the wifi tag starts
-// on the sparkline label row, between the window label and the night figure.
-const (
-	cellW    = 7
-	wifiTagX = 104
-)
+// fixed-width strings without measuring.
+const cellW = 7
 
 func mustFace(ttf []byte, px float64) font.Face {
 	f, err := opentype.Parse(ttf)
@@ -159,6 +155,55 @@ func triDown(img *image.Gray, x, y, s int) {
 	}
 }
 
+// --- icons ---
+//
+// Hand-placed 1-bit art, not geometry: at this size every pixel is a design
+// decision and a rasterised arc just produces mush. '#' is black, anything else
+// is left alone — except '_', which is forced white, so the "off" slash can cut
+// a clean gap through the arcs underneath it.
+
+var wifiOnArt = []string{
+	".......#######.......",
+	".....###########.....",
+	"....###.......###....",
+	"...##.....#.....##...",
+	"..##...#######...##..",
+	"......###...###......",
+	".....##..###..##.....",
+	".....#..#####..#.....",
+	"........#####........",
+	"........#####........",
+	".........###.........",
+}
+
+var wifiOffArt = []string{
+	".....##_######.......",
+	"....._##_#######.....",
+	"....##_##.....###....",
+	"...##...##......##...",
+	"..##.....##......##..",
+	"..........##.........",
+	".........#_##........",
+	"........###_##.......",
+	"........####_##......",
+	"........#####.##.....",
+	".........###.........",
+}
+
+// drawArt paints art with its top-left at (x, y).
+func drawArt(img *image.Gray, x, y int, art []string) {
+	for dy, row := range art {
+		for dx, c := range row {
+			switch c {
+			case '#':
+				px(img, x+dx, y+dy, true)
+			case '_':
+				px(img, x+dx, y+dy, false)
+			}
+		}
+	}
+}
+
 // --- text helpers ---
 
 func text(img *image.Gray, fc font.Face, x, baseline int, s string) {
@@ -236,10 +281,15 @@ func RenderDashboard(d *APIData, ferr error) *image.Gray {
 	if L.Synced == 0 {
 		stamp += " ?clk"
 	}
-	// At 7 px/char the stamp is 112 px, or 147 px with the " ?clk" suffix — that
-	// plus the title leaves no room for the wifi tag, so the tag moved down to
-	// the sparkline label row.
+	// At 7 px/char the stamp is 112 px, or 147 px with the " ?clk" suffix. That
+	// leaves no room for a *worded* wifi tag beside the title, but an icon fits
+	// in the gap with room to spare.
 	textRight(img, fTiny, W-5, 6, stamp)
+	art := wifiOnArt
+	if d.WifiOff {
+		art = wifiOffArt
+	}
+	drawArt(img, 5+textW(fTitle, "batterijtje")+8, 7, art)
 	hline(img, 3, W-4, 22)
 
 	// ---- left column: SoC hero ----
@@ -311,13 +361,6 @@ func RenderDashboard(d *APIData, ferr error) *image.Gray {
 
 	// ---- sparkline: 48h SoC ----
 	textTop(img, fTiny, 6, 107, windowLabel(d.WindowHours))
-	// Fixed left edge, not centred: "wifi on" and "wifi off" differ by a cell, and
-	// a field that shifts when it changes is exactly what partial refresh hates.
-	wifiTag := "wifi on"
-	if d.WifiOff {
-		wifiTag = "wifi off"
-	}
-	textTop(img, fTiny, wifiTagX, 107, wifiTag)
 	night := "night -"
 	if d.LastNight != nil {
 		night = fmt.Sprintf("night %d Ah", d.LastNight.OutAh)
