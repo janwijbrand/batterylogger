@@ -27,10 +27,11 @@ off-box; deploy the logger with `scp`, the Go binary via `eink/build.sh` + `scp`
   image). **Keep every `fTiny`/`fSmall` string ASCII** — the face has no glyph outside
   0x20-0x7e and silently paints U+FFFD boxes. Layout is 7 px per character; check new
   strings against `-nopaint -mono -png x.png -scale 4` before believing they fit.
-- **Icons are hand-placed art, not geometry** (`wifiOnArt`/`wifiOffArt`): `#` is
-  black, `_` forces white (that is how a strike-through cuts a gutter through what
-  it crosses), anything else is left alone. Rasterising arcs at this size produces
-  mush — draw it, render it at `-scale 8`, look at it, adjust.
+- **Icons are hand-placed art, not geometry** (`wifiOnArt`): `#` is black,
+  anything else is left alone. Rasterising arcs at this size produces mush — draw
+  it, render it at `-scale 8`, look at it, adjust. Wifi off is drawn as *no icon*;
+  a strike-through can't be made to read at 21x11 (its white gutter eats the arcs
+  it crosses), so don't re-attempt one without a bigger panel.
 
 ## Data notes (read before "fixing" these)
 - **Net measurement, by design.** The AccuBox exposes **one** current at the battery

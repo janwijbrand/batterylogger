@@ -158,9 +158,13 @@ func triDown(img *image.Gray, x, y, s int) {
 // --- icons ---
 //
 // Hand-placed 1-bit art, not geometry: at this size every pixel is a design
-// decision and a rasterised arc just produces mush. '#' is black, anything else
-// is left alone — except '_', which is forced white, so the "off" slash can cut
-// a clean gap through the arcs underneath it.
+// decision and a rasterised arc just produces mush.
+//
+// There is deliberately no "wifi off" icon. A strike-through needs a white
+// gutter either side to read as crossing rather than merging, and at 21x11 that
+// gutter eats the arcs it crosses — every variant came out looking like a
+// smudge. Absence is unambiguous where a slash was not: icon = on, no icon =
+// off.
 
 var wifiOnArt = []string{
 	".......#######.......",
@@ -176,29 +180,13 @@ var wifiOnArt = []string{
 	".........###.........",
 }
 
-var wifiOffArt = []string{
-	".....##_######.......",
-	"....._##_#######.....",
-	"....##_##.....###....",
-	"...##...##......##...",
-	"..##.....##......##..",
-	"..........##.........",
-	".........#_##........",
-	"........###_##.......",
-	"........####_##......",
-	"........#####.##.....",
-	".........###.........",
-}
-
-// drawArt paints art with its top-left at (x, y).
+// drawArt paints art with its top-left at (x, y); '#' is black, anything else
+// is left alone.
 func drawArt(img *image.Gray, x, y int, art []string) {
 	for dy, row := range art {
 		for dx, c := range row {
-			switch c {
-			case '#':
+			if c == '#' {
 				px(img, x+dx, y+dy, true)
-			case '_':
-				px(img, x+dx, y+dy, false)
 			}
 		}
 	}
@@ -285,11 +273,9 @@ func RenderDashboard(d *APIData, ferr error) *image.Gray {
 	// leaves no room for a *worded* wifi tag beside the title, but an icon fits
 	// in the gap with room to spare.
 	textRight(img, fTiny, W-5, 6, stamp)
-	art := wifiOnArt
-	if d.WifiOff {
-		art = wifiOffArt
+	if !d.WifiOff {
+		drawArt(img, 5+textW(fTitle, "batterijtje")+8, 7, wifiOnArt)
 	}
-	drawArt(img, 5+textW(fTitle, "batterijtje")+8, 7, art)
 	hline(img, 3, W-4, 22)
 
 	// ---- left column: SoC hero ----
