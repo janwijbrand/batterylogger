@@ -27,14 +27,30 @@ SCAN_TIMEOUT = 20.0
 FRAME_TIMEOUT = 8.0
 MIN_VALID_TS = 1_700_000_000            # ~2023-11-14; below this the clock is unset
 SYNC_MARKER = "/run/systemd/timesync/synchronized"  # present once NTP has synced this boot
+RTC_DEV = "/dev/rtc0"                   # the DS3231, which sets the clock at boot
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("batterylogger")
 
 
 def clock_synced() -> bool:
-    """True once systemd-timesyncd has completed at least one NTP sync this boot."""
-    return os.path.exists(SYNC_MARKER)
+    """True when the timestamp we are about to store can be trusted.
+
+    Two independent ways for that to be the case:
+
+    * systemd-timesyncd has completed an NTP sync this boot, or
+    * a battery-backed RTC (the DS3231) is present and the clock it restored at
+      boot reads as a plausible date.
+
+    The RTC arm matters because the panel deliberately boots with WiFi off
+    (KEY3 enables it), so on a trip there may be no NTP for days while the clock
+    is in fact correct. Testing only for NTP made the display's "?clk" warning
+    permanent and therefore worthless. A dead coin cell still gets caught: the
+    DS3231 then hands back an epoch-ish date, which fails the MIN_VALID_TS test.
+    """
+    if os.path.exists(SYNC_MARKER):
+        return True
+    return os.path.exists(RTC_DEV) and time.time() > MIN_VALID_TS
 
 
 def crc16_modbus(data: bytes) -> int:

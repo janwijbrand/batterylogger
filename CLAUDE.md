@@ -42,3 +42,6 @@ off-box; deploy the logger with `scp`, the Go binary via `eink/build.sh` + `scp`
 - **RTC fitted.** A DS3231 on I²C (`dtoverlay=i2c-rtc,ds3231`) keeps the clock across
   power-cuts, replacing `fake-hwclock`; each sample still carries a `synced` flag
   (the header shows `?clk` when it's unset) and aggregates ignore pre-2023 timestamps.
+  `synced` means "NTP has synced this boot **or** the RTC is present and the clock
+  is plausible" — don't narrow it back to NTP alone: WiFi is off by default, so on
+  a trip that would flag every sample while the time is actually right.

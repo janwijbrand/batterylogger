@@ -12,6 +12,19 @@ Data timestamps are UTC; the dates below are local (Europe/Amsterdam).
 
 Working toward 1.0.
 
+### 2026-09-04 — `?clk` stops crying wolf
+
+**Fixed**
+- **`clock_synced()` now trusts the DS3231**, not just NTP. It tested one thing —
+  whether systemd-timesyncd had synced this boot — which stopped being the right
+  question when the RTC went in. Since the daemon deliberately boots with WiFi
+  **off** (KEY3 enables it), a power-cut on a trip meant every sample was flagged
+  unsynced and the panel showed `?clk` indefinitely while the clock was in fact
+  correct — a permanent warning, i.e. one you learn to ignore. A sample is now
+  trusted if NTP has synced **or** `/dev/rtc0` is present and the clock reads
+  past `MIN_VALID_TS`. A dead coin cell is still caught: the DS3231 then hands
+  back an epoch-ish date, which fails that same test.
+
 ### 2026-09-03 — partial (non-flashing) refresh
 
 **Changed**
