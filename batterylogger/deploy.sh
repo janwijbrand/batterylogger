@@ -2,9 +2,9 @@
 # Deploy the Python logger to the Pi and restart it.
 # Usage: ./deploy.sh [user@host]     (or export DEPLOY_TARGET=user@host)
 #
-# The Go binaries (batteryeink) are built + copied separately, e.g.:
-#   ( cd eink && ./build.sh ) && scp eink/batteryeink "$HOST:~/batterylogger/"
-#   ssh "$HOST" sudo systemctl start batteryeink.service   # repaint now
+# The Go binary has its own script, which handles the running daemon holding
+# the file open ("text file busy" on a plain scp):
+#   ./eink/deploy.sh "$HOST"
 set -euo pipefail
 
 HOST="${1:-${DEPLOY_TARGET:-user@hostname.local}}"

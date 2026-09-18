@@ -100,6 +100,7 @@ batterylogger/
   eink/                batteryeink — Go renderer for the 2.7" e-Paper HAT
   requirements.txt     pip deps for the logger (installed into the Pi venv)
   deploy.sh            scp the logger to the Pi + restart it
+  eink/deploy.sh       build + install batteryeink over the running daemon
   systemd/             unit files (logger, wifi-watchdog, eink daemon, ...)
 docs/demo-data.py      builds the fake battery.db behind the README shots
 van-battery-logger-brief.md   original brief
@@ -138,7 +139,8 @@ python3 -m venv ~/batterylogger/venv
 printf '[connection]\nwifi.powersave = 2\n' | \
   sudo tee /etc/NetworkManager/conf.d/wifi-powersave-off.conf >/dev/null
 
-# Build + copy the e-ink renderer (from a dev machine with Go):
+# Build + copy the e-ink renderer (from a dev machine with Go). On a fresh Pi
+# nothing holds the binary open yet; for later updates use eink/deploy.sh.
 ( cd batterylogger/eink && ./build.sh )
 scp batterylogger/eink/batteryeink $USER@host:~/batterylogger/
 
@@ -156,8 +158,16 @@ user — `nmcli radio wifi`, `systemctl` on the watchdog, and `poweroff`.)
 ## Deploy changes
 
 ```bash
-cd batterylogger && ./deploy.sh user@hostname.local   # or: export DEPLOY_TARGET=...
+cd batterylogger
+./deploy.sh user@hostname.local        # logger.py  -> restart batterylogger
+./eink/deploy.sh user@hostname.local   # batteryeink -> restart batteryeink
+# or: export DEPLOY_TARGET=user@hostname.local
 ```
+
+`eink/deploy.sh` copies the binary as `.new` and renames it into place: the
+running daemon holds the old binary open, so a plain `scp` onto it fails with
+*text file busy*. The rename only swaps the directory entry, leaving the running
+process on the old inode until systemd restarts it.
 
 ## Data notes
 
