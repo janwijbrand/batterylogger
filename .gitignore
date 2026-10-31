@@ -21,3 +21,6 @@ batterylogger/eink/eink
 
 # debug PNGs from the e-ink renderer (the -png flag)
 batterylogger/eink/*.png
+
+# Local reports built from the trip data (they hold real data, so they stay out of git)
+reports/

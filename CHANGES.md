@@ -12,6 +12,18 @@ Data timestamps are UTC; the dates below are local (Europe/Amsterdam).
 
 Working toward 1.0.
 
+### 2026-10-31 — a journal that lasts a trip
+
+**Changed**
+- **The persistent journal now keeps about four weeks instead of five days.**
+  The first real trip showed the gap: the Pi rebooted once while away, and by
+  the time the van was home the 50 MB cap had already rotated that boot out.
+  The cap is now 250 MB, which still leaves the SD card mostly empty.
+- **bluetoothd's "No matching connection for device" is filtered out** with a
+  `LogFilterPatterns=` drop-in on `bluetooth.service`. It fired at error level
+  on every poll (about 5,700 lines a day), so it filled half the journal and
+  made real Bluetooth errors hard to spot.
+
 ### 2026-09-04 — new README shots
 
 **Changed**
