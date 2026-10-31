@@ -12,6 +12,27 @@ Data timestamps are UTC; the dates below are local (Europe/Amsterdam).
 
 Working toward 1.0.
 
+### 2026-10-31 — the RTC's thermometer, and no luck with the BMS's
+
+**Added**
+- **Each sample now stores `rtc_temp`**, the DS3231's own temperature reading.
+  On the first trip the battery refused charge for 42 hours, most likely because
+  it was cold, but nothing in the data could show the temperature. This sensor is
+  rough (±3 °C, 0.25 °C steps) and measures the enclosure, not the cells. It
+  still shows a frosty night, and it needs no extra hardware. The logger finds
+  the sensor by its hwmon name, because the hwmon number can change between boots.
+- The logger's INSERT now names its columns, so adding a column can't shift values.
+
+**Found**
+- **The BMS exposes no temperature over BLE.** A read-only Modbus probe found only
+  the two blocks we already knew (`0x0300` x 4 and `0x0400` x 8). Every other
+  address tried answered with exception 2, illegal data address. The README's
+  protocol section lists what was probed.
+
+**Fixed**
+- The README setup steps now install the journald config and the bluetoothd
+  drop-in from the previous entry.
+
 ### 2026-10-31 — a journal that lasts a trip
 
 **Changed**

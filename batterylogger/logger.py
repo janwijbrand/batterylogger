@@ -7,6 +7,8 @@ Protocol reverse-engineered from the ECTIVE 'BM X' Android app
 (com.lipower.battery): Modbus-RTU over BLE char ffe1. The Modbus slave id
 is the LAST segment of the advertised name (e.g. 22-11-07-042 -> slave 42).
 Status = readHoldingRegisters(slave, 0x0400, 8); 21-byte big-endian reply.
+
+Each sample also stores the DS3231 RTC's own temperature reading (rtc_temp).
 """
 import asyncio
 import logging
@@ -28,6 +30,7 @@ FRAME_TIMEOUT = 8.0
 MIN_VALID_TS = 1_700_000_000            # ~2023-11-14; below this the clock is unset
 SYNC_MARKER = "/run/systemd/timesync/synchronized"  # present once NTP has synced this boot
 RTC_DEV = "/dev/rtc0"                   # the DS3231, which sets the clock at boot
+HWMON_ROOT = "/sys/class/hwmon"
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("batterylogger")
@@ -51,6 +54,36 @@ def clock_synced() -> bool:
     if os.path.exists(SYNC_MARKER):
         return True
     return os.path.exists(RTC_DEV) and time.time() > MIN_VALID_TS
+
+
+_rtc_temp_file = None
+
+
+def rtc_temp():
+    """The DS3231's own temperature in °C, or None when it can't be read.
+
+    The chip measures temperature to correct its crystal, and the kernel driver
+    exposes that as a hwmon sensor. It is a rough number: +/-3 °C, in 0.25 °C
+    steps, refreshed every 64 s. It measures the inside of the enclosure, not
+    the battery cells. Still, it shows a frosty night, which the BMS registers
+    don't. The hwmon index can change between boots, so the sensor is found by
+    name. The driver registers late in boot, so a miss is retried next poll.
+    """
+    global _rtc_temp_file
+    try:
+        if _rtc_temp_file is None:
+            for h in sorted(os.listdir(HWMON_ROOT)):
+                with open(os.path.join(HWMON_ROOT, h, "name")) as f:
+                    if f.read().strip() == "ds3231":
+                        _rtc_temp_file = os.path.join(HWMON_ROOT, h, "temp1_input")
+                        break
+            else:
+                return None
+        with open(_rtc_temp_file) as f:
+            return int(f.read()) / 1000
+    except (OSError, ValueError):
+        _rtc_temp_file = None
+        return None
 
 
 def crc16_modbus(data: bytes) -> int:
@@ -93,12 +126,14 @@ def init_db() -> sqlite3.Connection:
              ts INTEGER PRIMARY KEY,
              voltage REAL, current REAL, power INTEGER,
              soc INTEGER, remaining_ah INTEGER, direction INTEGER,
-             rt_hours INTEGER, rt_min INTEGER, raw TEXT, synced INTEGER)"""
+             rt_hours INTEGER, rt_min INTEGER, raw TEXT, synced INTEGER,
+             rtc_temp REAL)"""
     )
-    # migrate DBs created before the `synced` column existed
+    # migrate DBs created before these columns existed
     cols = [r[1] for r in con.execute("PRAGMA table_info(samples)")]
-    if "synced" not in cols:
-        con.execute("ALTER TABLE samples ADD COLUMN synced INTEGER")
+    for col, kind in (("synced", "INTEGER"), ("rtc_temp", "REAL")):
+        if col not in cols:
+            con.execute(f"ALTER TABLE samples ADD COLUMN {col} {kind}")
     con.commit()
     return con
 
@@ -154,9 +189,11 @@ async def poll_once(con: sqlite3.Connection) -> bool:
     if ts < MIN_VALID_TS:
         log.warning("system clock not set (ts=%d); sample flagged unsynced", ts)
     con.execute(
-        "INSERT OR REPLACE INTO samples VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+        "INSERT OR REPLACE INTO samples(ts, voltage, current, power, soc, remaining_ah,"
+        " direction, rt_hours, rt_min, raw, synced, rtc_temp) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
         (ts, v["voltage"], v["current"], v["power"], v["soc"],
-         v["remaining_ah"], v["direction"], v["rt_hours"], v["rt_min"], frame.hex(), synced),
+         v["remaining_ah"], v["direction"], v["rt_hours"], v["rt_min"], frame.hex(), synced,
+         rtc_temp()),
     )
     con.commit()
     log.info("V=%.1f I=%.2f P=%d SoC=%d%% Ah=%d %s%s", v["voltage"], v["current"],

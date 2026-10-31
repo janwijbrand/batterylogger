@@ -89,6 +89,16 @@ Not documented publicly for the Accubox; recovered by decompiling the ECTIVE
   | 15–16 | voltage | ×0.1 V |
   | 17–18 | power | W |
 
+- **Device parameters** = read-holding-registers(slave, `0x0300`, 4). On our unit
+  that returns `120, 152, 110, 10`. The first matches the rated 120 Ah; the others
+  look like voltage limits in 0.1 V (15.2 V, 11.0 V) and an unknown 10, but that is
+  unconfirmed. Asking for more than 4 registers there gets Modbus exception 3.
+- **That is the whole map, as far as we can tell.** A read-only probe (functions
+  `0x03` and `0x04` only) of `0x0000`-`0x0A00` in steps of `0x100`, `0x1000`,
+  `0x2000`, and the blocks next to `0x0300` and `0x0400` got Modbus exception 2
+  (illegal data address) everywhere else. So the BMS's own temperature, which it
+  clearly measures, is not readable over BLE.
+
 `logger.py` is self-contained (its own CRC-16/Modbus; no dependency on the
 `aiobmsble` plugin, which does not support this slave-id-from-name scheme).
 
@@ -150,6 +160,13 @@ for u in batterylogger wifi-watchdog batteryeink; do
   sed "s/__USER__/$USER/g" systemd/$u.service | sudo tee /etc/systemd/system/$u.service >/dev/null
 done
 sudo systemctl enable --now batterylogger wifi-watchdog batteryeink
+
+# Keep the journal on disk (about four weeks), minus bluetoothd's per-poll noise:
+sudo install -D -m 644 systemd/journald-persistent.conf /etc/systemd/journald.conf.d/persistent.conf
+sudo install -D -m 644 systemd/bluetooth.service.d/quiet-disconnect.conf \
+  /etc/systemd/system/bluetooth.service.d/quiet-disconnect.conf
+sudo mkdir -p /var/log/journal && sudo systemctl daemon-reload
+sudo systemctl restart systemd-journald bluetooth
 ```
 
 (The KEY3/KEY4 button actions need passwordless `sudo` for the `batteryeink`
@@ -179,6 +196,10 @@ process on the old inode until systemd restarts it.
   `Europe/Amsterdam` for the overnight-window figure.
 - **DS3231 RTC** on I²C (`dtoverlay=i2c-rtc,ds3231`) keeps the clock correct
   across power-cuts on its coin cell; each sample still carries a `synced` flag.
+- **`rtc_temp`** is the DS3231's own temperature sensor, stored with each sample.
+  It is rough (±3 °C, 0.25 °C steps, refreshed every 64 s) and measures the
+  enclosure, not the battery cells. It is there to show cold nights, because the
+  BMS registers include no temperature. Rows from before 2026-10-31 have NULL.
 
 ## Status / roadmap
 
