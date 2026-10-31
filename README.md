@@ -154,8 +154,14 @@ printf '[connection]\nwifi.powersave = 2\n' | \
 ( cd batterylogger/eink && ./build.sh )
 scp batterylogger/eink/batteryeink $USER@host:~/batterylogger/
 
-# Install services (substitute your Pi user for the __USER__ placeholder):
-sudo install -m 755 systemd/wifi-watchdog.sh /usr/local/sbin/   # watchdog daemon script
+# Install services. sed fills in the placeholders: __USER__ (your Pi user) in the
+# units, and __HOME_SSID__ / __HOME_GATEWAY__ in the watchdog. Set those two first
+# (a value containing / & \ or ' needs escaping):
+HOME_SSID='your-home-wifi'   # the network the watchdog treats as home
+HOME_GATEWAY=192.168.1.1     # its router; only pinged when there is no default route
+sed -e "s/__HOME_SSID__/$HOME_SSID/" -e "s/__HOME_GATEWAY__/$HOME_GATEWAY/" \
+  systemd/wifi-watchdog.sh | sudo tee /usr/local/sbin/wifi-watchdog.sh >/dev/null
+sudo chmod 755 /usr/local/sbin/wifi-watchdog.sh                 # watchdog daemon script
 for u in batterylogger wifi-watchdog batteryeink; do
   sed "s/__USER__/$USER/g" systemd/$u.service | sudo tee /etc/systemd/system/$u.service >/dev/null
 done
@@ -201,6 +207,37 @@ process on the old inode until systemd restarts it.
   enclosure, not the battery cells. It is there to show cold nights, because the
   BMS registers include no temperature. Rows from before 2026-10-31 have NULL.
 
+## Why keep the history
+
+The AccuBox's own display and app show the battery as it is *now*. batterijtje
+keeps every reading, so you can still ask questions weeks later. The first real
+trip shows what that is worth: three weeks in October 2026, with the van parked
+most of the time.
+
+![Four stacked charts over the whole trip on one time axis: state of charge, net current, voltage and outside air temperature, with a strip of events along the top](docs/trip-history.png)
+
+> The whole trip on one time axis. Charge, current and voltage come from
+> batterijtje's log, in 10-minute buckets. The strip along the top marks what
+> the data revealed afterwards: a 4 A load cycling on and off, 42 hours in which
+> the battery took no charge at all, and one top-up from a 230 V charger.
+
+![The same four charts zoomed in on 17 to 23 October, around the 42 hours of blocked charging](docs/trip-history-charge-block.png)
+
+> Zoomed in on those 42 hours. At night the battery read 12.5 V instead of its
+> usual 13.1 V. Around midday it showed the charger's 14.7 V, but no current went
+> in. That pattern means the BMS had switched off charging. It lines up with
+> nights below freezing, and LiFePO4 cells must not be charged below 0 °C. A
+> display that only shows the present moment can't reveal this. The history can,
+> even after the fact.
+
+*These charts were made once, by hand, from the trip's SQLite log after the van
+was home. They are not a batterijtje feature: its own output is the e-ink panel
+at the top of this page. The temperature isn't measured by batterijtje either. It is a
+weather-model estimate for where the van was parked (weather data by
+[Open-Meteo.com](https://open-meteo.com/), CC BY 4.0). Since this trip,
+batterijtje also stores the DS3231's own rough temperature reading; see
+[Data notes](#data-notes).*
+
 ## Status / roadmap
 
 - [x] Logger + e-ink dashboard running, boot-persistent, survives WiFi drops & reboots
@@ -215,8 +252,9 @@ process on the old inode until systemd restarts it.
 - [x] E-ink reads SQLite directly; web dashboard retired (renderer is self-sufficient)
 - [ ] Re-verify the coin-cell backup after the RTC solder rework
 - [x] Utilise the 4 HAT buttons (refresh · window · WiFi · info/power-off)
-- [ ] 3D-printed housing
-- [ ] Log a full multi-day off-grid trip → tag **1.0**
+- [x] 3D-printed housing
+- [x] Log a full multi-day off-grid trip (October 2026; see above)
+- [ ] Tag **1.0**
 - [ ] Move development to the spare Pi 3
 
 ## License

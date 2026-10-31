@@ -12,6 +12,30 @@ Data timestamps are UTC; the dates below are local (Europe/Amsterdam).
 
 Working toward 1.0.
 
+### 2026-10-31 — what a trip's history shows
+
+**Added**
+- **A "Why keep the history" section in the README**, with two charts from the
+  first real trip. They stack charge, current, voltage and outside temperature
+  on one time axis. One shows the whole trip, the other zooms in on the 42 hours
+  when the BMS blocked charging during frosty nights. The battery's own display
+  could never have shown that, because it only shows the present.
+- The charts were made once, by hand, after the trip. They are not a feature of
+  batterijtje, and the README says so. They carry no place names. The section
+  sits between "Data notes" and the roadmap.
+
+**Changed**
+- **The roadmap ticks off the 3D-printed housing and the multi-day trip.**
+  Tagging 1.0 is now its own item.
+- **No more identifying details in the files.** The watchdog's home SSID and
+  fallback gateway are now `__HOME_SSID__` and `__HOME_GATEWAY__` placeholders,
+  which the README setup step fills in with `sed`, like `__USER__`. Left
+  unfilled, the watchdog never reboots over the home network, but it still
+  recovers a dead radio. The BLE protocol example uses a made-up device name, so
+  the slave id and request frame changed with it. A region name, and LAN
+  addresses in preview data, are gone too. The git history was rewritten to
+  remove the same values from older commits.
+
 ### 2026-10-31 — the RTC's thermometer, and no luck with the BMS's
 
 **Added**

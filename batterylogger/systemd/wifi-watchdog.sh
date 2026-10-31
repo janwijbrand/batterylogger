@@ -11,10 +11,15 @@
 # (NM state 'unavailable' / iface gone) OR our home network is in range but unreachable.
 # When the radio is fine and home SSID is simply out of range (driving), it does nothing
 # — NetworkManager reconnects on its own once a known network reappears.
+#
+# HOME_SSID and the fallback gateway in the loop are placeholders. The README
+# setup steps fill them in with sed at install time. Left unfilled, home never
+# counts as "in range", so the script never reboots over an unreachable home
+# network. A dead radio is still recovered.
 set -u
 
 IFACE=wlan0
-HOME_SSID=__HOME_SSID__                                 # home network; "unreachable" != "in range"
+HOME_SSID='__HOME_SSID__'                              # home network; "unreachable" != "in range"
 STATE=/run/wifi-watchdog.fails                         # tmpfs; for external `cat` inspection
 REBOOT_STAMP=/var/lib/wifi-watchdog/last-reboot        # persists across reboots
 INTERVAL=60                                            # seconds between checks
@@ -35,7 +40,7 @@ fails=0
 last_hb=0
 while :; do
     GW=$(ip route show default 2>/dev/null | awk '/default/{print $3; exit}')
-    TARGET="${GW:-192.168.1.1}"                       # LAN gateway, fallback to known IP
+    TARGET="${GW:-__HOME_GATEWAY__}"                    # LAN gateway, fallback to known IP
     now=$(date +%s)
 
     if ping -c 2 -W 2 "$TARGET" >/dev/null 2>&1; then
